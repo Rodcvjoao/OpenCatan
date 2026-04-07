@@ -58,7 +58,7 @@
             <div class="flex flex-col space-y-2 pointer-events-auto">
                 <button class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl" onclick="showToast('Chat not implemented yet')">&#x1F4AC;</button>
                 <button class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl" onclick="showToast('Emotes not implemented yet')">&#x1F642;</button>
-                <button class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl" onclick="showToast('Trade not implemented yet')">&#x1F91D;</button>
+                <button class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl" onclick="doPlayerTrade()">&#x1F91D;</button>
                 <button class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl" onclick="showToast('Stats not implemented yet')">&#x1F4CA;</button>
                 <button class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl" onclick="showToast('Info not implemented yet')">&#x2139;&#xFE0F;</button>
                 <button class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl" onclick="showToast('Rules not implemented yet')">&#x1F4D6;</button>
@@ -196,7 +196,31 @@
         // Track whether current turn has rolled (backend doesn't reset last_roll)
         lastKnownTurn: null, // {turnNumber, playerId}
         hasRolledThisTurn: false,
+        requestSeq: 0,
     };
+
+    function hasState() {
+        return !!GameState.publicState;
+    }
+
+    function playersList() {
+        return GameState.publicState?.players || [];
+    }
+
+    function allPlayersHavePieces(minSettlements, minRoads) {
+        return playersList().every(p => (p.settlements || []).length >= minSettlements && (p.roads || []).length >= minRoads);
+    }
+
+    function isLegacySetupComplete() {
+        const phase = GameState.publicState?.phase;
+        if (phase !== 'SETUP_1' && phase !== 'SETUP_2') return false;
+        return allPlayersHavePieces(2, 2);
+    }
+
+    function effectivePhase() {
+        if (!hasState()) return null;
+        return isLegacySetupComplete() ? 'MAIN' : GameState.publicState.phase;
+    }
 
     function updateState(envelope) {
         if (!envelope) return;
@@ -257,11 +281,13 @@
 
     async function apiCommand(command, payload = {}) {
         if (!GameState.gameId || !GameState.playerToken) return null;
+        GameState.requestSeq += 1;
         const body = {
             player_token: GameState.playerToken,
             command: command,
             payload: payload,
-            expected_version: GameState.version
+            expected_version: GameState.version,
+            request_id: `${Date.now()}-${GameState.requestSeq}-${command}`
         };
         try {
             const res = await fetch(`${API_BASE}/games/${GameState.gameId}/commands`, {
@@ -404,6 +430,7 @@
     // Board group (cleared & rebuilt on state updates)
     const boardGroup = new THREE.Group();
     scene.add(boardGroup);
+    const dynamicTextures = new Set();
 
     // ======== GEOMETRY CONSTANTS ========
     const hexSize = 7;
@@ -423,6 +450,22 @@
     const hlRoadMat = new THREE.MeshStandardMaterial({ color: 0x00ff00, transparent: true, opacity: 0.5 });
     const hlCityMat = new THREE.MeshStandardMaterial({ color: 0x00ccff, transparent: true, opacity: 0.5 });
     const hlRobberMat = new THREE.MeshStandardMaterial({ color: 0xff0000, transparent: true, opacity: 0.4 });
+    const reusableGeometries = new Set([
+        hexGeom,
+        tokenGeom,
+        roadGeo,
+        houseBaseGeo,
+        houseRoofGeo,
+        cityBaseGeo,
+        cityTopGeo
+    ]);
+    const reusableMaterials = new Set([
+        ...Object.values(hexMaterials),
+        hlSettlementMat,
+        hlRoadMat,
+        hlCityMat,
+        hlRobberMat
+    ]);
 
     function getHexPixelPos(q, r) {
         const x = hexSize * hexGap * Math.sqrt(3) * (q + r / 2);
@@ -447,7 +490,7 @@
             if (!center) continue;
             for (let i = 0; i < 6; i++) {
                 const vid = tile.vertex_ids[i];
-                const angle = (Math.PI / 6) + (i * Math.PI / 3);
+                const angle = (-Math.PI / 6) + (i * Math.PI / 3);
                 const vx = center.x + hexSize * Math.cos(angle);
                 const vz = center.z + hexSize * Math.sin(angle);
                 if (!samples[vid]) samples[vid] = [];
@@ -500,7 +543,37 @@
         }
         const texture = new THREE.CanvasTexture(canvas);
         texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        dynamicTextures.add(texture);
         return texture;
+    }
+
+    function disposeMaterial(material) {
+        if (!material) return;
+        const materials = Array.isArray(material) ? material : [material];
+        for (const mat of materials) {
+            if (!mat) continue;
+            if (reusableMaterials.has(mat)) continue;
+            if (mat.map && dynamicTextures.has(mat.map)) {
+                mat.map.dispose();
+                dynamicTextures.delete(mat.map);
+            }
+            mat.dispose();
+        }
+    }
+
+    function clearBoardGroup() {
+        for (let i = boardGroup.children.length - 1; i >= 0; i--) {
+            const obj = boardGroup.children[i];
+            boardGroup.remove(obj);
+            obj.traverse((child) => {
+                if (child.geometry && !reusableGeometries.has(child.geometry)) {
+                    child.geometry.dispose();
+                }
+                if (child.material) {
+                    disposeMaterial(child.material);
+                }
+            });
+        }
     }
 
     // ======== 3D RENDER FUNCTIONS ========
@@ -613,7 +686,7 @@
         const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5 });
         const road = new THREE.Mesh(roadGeo, mat);
         road.position.set(x, hexHeight / 2 + 0.4, z);
-        road.rotation.y = -angle + Math.PI / 2;
+        road.rotation.y = -angle;
         road.castShadow = true; road.receiveShadow = true;
         boardGroup.add(road);
     }
@@ -649,7 +722,7 @@
                 if (!pos) continue;
                 const road = new THREE.Mesh(roadGeo, hlRoadMat);
                 road.position.set(pos.x, hexHeight / 2 + 0.4, pos.z);
-                road.rotation.y = -pos.angle + Math.PI / 2;
+                road.rotation.y = -pos.angle;
                 road.userData = { type: 'edge', id: edge.id };
                 boardGroup.add(road);
             }
@@ -686,7 +759,7 @@
 
     // ======== SCENE REBUILD ========
     function rebuildScene() {
-        while (boardGroup.children.length > 0) boardGroup.remove(boardGroup.children[0]);
+        clearBoardGroup();
         const state = GameState.publicState;
         if (!state) return;
         const board = state.board;
@@ -800,7 +873,7 @@
     }
 
     function isSetupPhase() {
-        const phase = GameState.publicState?.phase;
+        const phase = effectivePhase();
         return phase === 'SETUP_1' || phase === 'SETUP_2';
     }
 
@@ -819,9 +892,10 @@
 
     function inferLegalActions() {
         const s = GameState.publicState;
-        if (!s || s.phase === 'FINISHED') return [];
+        if (!s) return [];
+        const phase = effectivePhase();
+        if (phase === 'FINISHED') return [];
         const actions = [];
-        const phase = s.phase;
         const myTurn = isMyTurn();
 
         // Check pending states (if backend provides them)
@@ -861,7 +935,16 @@
             if (!GameState.hasRolledThisTurn) {
                 actions.push('roll_dice');
             } else {
-                actions.push('build_road', 'build_settlement', 'build_city', 'buy_development_card', 'end_turn');
+                actions.push(
+                    'build_road',
+                    'build_settlement',
+                    'build_city',
+                    'buy_development_card',
+                    'play_development_card',
+                    'trade_bank',
+                    'trade_player',
+                    'end_turn'
+                );
             }
         }
         return actions;
@@ -944,8 +1027,8 @@
         const el = document.getElementById('action-buttons');
         if (!GameState.publicState) { el.innerHTML = ''; return; }
 
-        const legal = getLegalActions();
         const mode = GameState.interactionMode;
+        const phase = effectivePhase() || GameState.publicState.phase;
         let html = '';
 
         // Auto-enter setup placement
@@ -990,18 +1073,24 @@
         if (hasLegalAction('buy_development_card')) {
             html += '<button class="btn-action px-4 py-2 rounded flex items-center space-x-2 font-bold text-[#3e2723] text-sm" onclick="doBuyDevCard()"><span>&#128220;</span><span>Dev Card</span></button>';
         }
+        if (hasLegalAction('trade_bank')) {
+            html += '<button class="btn-action px-4 py-2 rounded flex items-center space-x-2 font-bold text-[#3e2723] text-sm" onclick="doBankTrade()"><span>&#128176;</span><span>Bank Trade</span></button>';
+        }
+        if (hasLegalAction('trade_player')) {
+            html += '<button class="btn-action px-4 py-2 rounded flex items-center space-x-2 font-bold text-[#3e2723] text-sm" onclick="doPlayerTrade()"><span>&#x1F91D;</span><span>Player Trade</span></button>';
+        }
         if (hasLegalAction('end_turn')) {
             html += '<button class="btn-action px-4 py-2 rounded flex items-center space-x-2 font-bold text-[#3e2723] text-sm" onclick="doEndTurn()"><span>&#8635;</span><span>End Turn</span></button>';
         }
 
         // Waiting for other player
-        if (!isMyTurn() && GameState.publicState.phase !== 'FINISHED' && !hasLegalAction('discard_resources')) {
+        if (!isMyTurn() && phase !== 'FINISHED' && !hasLegalAction('discard_resources')) {
             const cp = GameState.playerMap[GameState.publicState.turn?.current_player_id];
             html += '<div class="bg-black/60 text-yellow-300 text-xs px-3 py-1.5 rounded border border-yellow-800">Waiting for ' + (cp?.name || '...') + '...</div>';
         }
 
         // Finished
-        if (GameState.publicState.phase === 'FINISHED') {
+        if (phase === 'FINISHED') {
             const winner = GameState.publicState.players.reduce((a, b) => a.victory_points > b.victory_points ? a : b);
             html += '<div class="bg-yellow-700 text-white text-sm px-4 py-2 rounded-lg font-game border-2 border-yellow-400">&#127942; ' + winner.name + ' wins!</div>';
         }
@@ -1031,6 +1120,41 @@
         }
     }
 
+    async function doPlayerTrade() {
+        if (!hasLegalAction('trade_player')) {
+            showToast('Player trade not available right now', 'warning');
+            return;
+        }
+        const others = playersList().filter(p => p.id !== GameState.myPlayerId);
+        if (others.length === 0) {
+            showToast('No trade target available', 'warning');
+            return;
+        }
+        const target = others[0];
+        const result = await apiCommand('trade_player', {
+            to_player_id: target.id,
+            give: { brick: 1 },
+            receive: { wool: 1 }
+        });
+        if (result && result.accepted) {
+            showToast('Traded with ' + target.name, 'success');
+        }
+    }
+
+    async function doBankTrade() {
+        if (!hasLegalAction('trade_bank')) {
+            showToast('Bank trade not available right now', 'warning');
+            return;
+        }
+        const result = await apiCommand('trade_bank', {
+            give: { brick: 4 },
+            receive: { ore: 1 }
+        });
+        if (result && result.accepted) {
+            showToast('Bank trade executed', 'success');
+        }
+    }
+
     async function doEndTurn() {
         GameState.interactionMode = 'none';
         await apiCommand('end_turn');
@@ -1040,7 +1164,7 @@
         const el = document.getElementById('game-status');
         if (!GameState.publicState) { el.textContent = ''; return; }
         const s = GameState.publicState;
-        const phase = s.phase;
+        const phase = effectivePhase() || s.phase;
         const turnPhase = s.turn?.turn_phase || '';
         const roll = s.turn?.last_roll;
         const turnNum = s.turn?.number || 0;
@@ -1077,7 +1201,7 @@
         }
 
         // Setup pending road
-        if (pending.setup && pending.setup.pending_road_player === GameState.myPlayerId) {
+        if (pending.setup && pending.setup.pending_setup_road_player_id === GameState.myPlayerId) {
             GameState.interactionMode = 'place_setup_road';
             rebuildScene();
             renderActionButtons();
