@@ -1,0 +1,56 @@
+@import url("https://fonts.googleapis.com/css2?family=Fredoka+One&family=Roboto:wght@400;700&display=swap");
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background-color: #1a1a1a;
+  font-family: "Roboto", sans-serif;
+  user-select: none;
+}
+
+.font-game {
+  font-family: "Fredoka One", cursive;
+}
+
+.btn-side {
+  background: linear-gradient(180deg, #ffca28, #f57f17);
+  border: 2px solid #5d4037;
+  box-shadow: 0 4px 0 #5d4037;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.btn-side:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 #5d4037;
+}
+.btn-side:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-action {
+  background: linear-gradient(180deg, #ffca28, #f57f17);
+  border: 2px solid #5d4037;
+  box-shadow: 0 3px 0 #5d4037;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.btn-action:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 #5d4037;
+}
+.btn-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-action.active {
+  background: linear-gradient(180deg, #66bb6a, #2e7d32);
+  border-color: #1b5e20;
+  box-shadow: 0 3px 0 #1b5e20;
+}
+
+.glow-current {
+  box-shadow: 0 0 15px 3px rgba(255, 215, 0, 0.7), 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar {
+  display: none;
+}

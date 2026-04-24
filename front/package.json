@@ -1,0 +1,21 @@
+{
+  "name": "opencatan-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OpenCatan 3D browser client (Vite + TypeScript + Three.js).",
+  "scripts": {
+    "dev": "vite --port 5173",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 5173",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.184.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0"
+  }
+}

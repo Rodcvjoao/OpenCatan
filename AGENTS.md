@@ -23,7 +23,7 @@ Rule: if a code change modifies behavior/contract, update docs in the same chang
 ## Monorepo Layout
 
 - `back/`: Python game engine + FastAPI + WS API
-- `front/`: browser client (`board.html`)
+- `front/`: browser client (Vite + TypeScript; entry `front/index.html`)
 
 ## Architecture Decisions (must follow)
 
@@ -50,6 +50,12 @@ Rule: if a code change modifies behavior/contract, update docs in the same chang
 - Context: frontend needs both command execution and realtime updates.
 - Decision: HTTP for create/state/commands; WS for game update notifications.
 - Consequence: after WS `game_state_updated`, frontend should refresh state with token to get private data.
+
+### Decision 5: Vite + TypeScript for frontend
+
+- Context: the frontend was a single 3000-line `board.html` godfile, hard to evolve.
+- Decision: the frontend is a Vite + TypeScript project under `front/`. Source lives in `front/src/` (state / net / ui / three layers). Static assets live in `front/public/`. Three.js is installed from npm; Tailwind is still loaded via CDN.
+- Consequence: frontend development requires Node + npm. Run with `npm run dev` (port 5173). `AGENTS.md` "Development Workflow" below is authoritative.
 
 ## Contract and Integration Rules
 
@@ -86,8 +92,12 @@ If these are changed, visually verify road/vertex alignment.
 
 ### Frontend
 
-- Serve with HTTP (not `file://`):
-  - `cd front && python -m http.server 5173`
+- Install and serve with Vite:
+  - `cd front && npm install`
+  - `cd front && npm run dev` (http://localhost:5173/)
+- Typecheck: `cd front && npm run typecheck`
+- Production build: `cd front && npm run build` (outputs to `front/dist/`)
+- Static assets go in `front/public/` and are served at `/assets/...`.
 
 ## Quality Checklist for Agents
 
