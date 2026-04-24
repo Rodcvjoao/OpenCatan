@@ -363,21 +363,151 @@
     scene.add(fillLight);
 
     // Materials
+    const textureLoader = new THREE.TextureLoader();
+    function loadRepeatingTexture(path, repeatX, repeatY) {
+        const texture = textureLoader.load(path);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(repeatX, repeatY);
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        texture.encoding = THREE.sRGBEncoding;
+        return texture;
+    }
+
+    function loadClampedTexture(path) {
+        const texture = textureLoader.load(path);
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        texture.encoding = THREE.sRGBEncoding;
+        return texture;
+    }
+
+    const oceanPlaneTexture = loadRepeatingTexture('assets/textures/ocean-water.png', 12, 12);
+    const hexTexturePaths = {
+        wood: 'assets/textures/hex-wood.png',
+        sheep: 'assets/textures/hex-sheep.png',
+        wheat: 'assets/textures/hex-wheat.png',
+        brick: 'assets/textures/hex-brick.png',
+        ore: 'assets/textures/hex-ore.png',
+        desert: 'assets/textures/hex-desert.png'
+    };
+    const hexTextures = {};
+    for (const [key, path] of Object.entries(hexTexturePaths)) {
+        hexTextures[key] = loadRepeatingTexture(path, 1, 1);
+    }
+    const hexTransitionTexture = loadClampedTexture('assets/textures/hex-transition-sand-ring.png');
     const hexColors = {
         wood:'#3b5e2b', sheep:'#8ebd3f', wheat:'#f0c24f',
-        brick:'#bd5a36', ore:'#82858c', desert:'#d6c596', ocean:'#408ab5'
+        brick:'#bd5a36', ore:'#82858c', desert:'#d6c596'
     };
-    const hexMaterials = {};
+    function createHexSideTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, '#d6b171');
+        gradient.addColorStop(0.45, '#b9874c');
+        gradient.addColorStop(1, '#7c5432');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        let seed = 42;
+        function random() {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            return seed / 4294967296;
+        }
+
+        for (let i = 0; i < 180; i++) {
+            const x = random() * canvas.width;
+            const y = random() * canvas.height;
+            const w = 12 + random() * 48;
+            const h = 1 + random() * 5;
+            const alpha = 0.05 + random() * 0.16;
+            ctx.fillStyle = random() > 0.5
+                ? `rgba(255, 224, 143, ${alpha})`
+                : `rgba(84, 51, 28, ${alpha})`;
+            ctx.fillRect(x, y, w, h);
+        }
+
+        ctx.strokeStyle = 'rgba(255, 229, 164, 0.22)';
+        ctx.lineWidth = 3;
+        for (let y = 18; y < canvas.height; y += 28) {
+            ctx.beginPath();
+            for (let x = 0; x <= canvas.width; x += 16) {
+                const wave = Math.sin((x + y) * 0.035) * 3;
+                if (x === 0) ctx.moveTo(x, y + wave);
+                else ctx.lineTo(x, y + wave);
+            }
+            ctx.stroke();
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.repeat.set(2, 1);
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        texture.encoding = THREE.sRGBEncoding;
+        return texture;
+    }
+
+    const hexSideTexture = createHexSideTexture();
+    const hexSideMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        map: hexSideTexture,
+        roughness: 0.9,
+        metalness: 0.0,
+        flatShading: true
+    });
+    const hexCapMat = new THREE.MeshStandardMaterial({
+        color: '#c9a66f',
+        roughness: 0.9,
+        metalness: 0.0,
+        flatShading: true
+    });
+    const hexBodyMaterials = [hexSideMat, hexCapMat, hexCapMat];
+    const hexTopMaterials = {};
     for (const [key, hex] of Object.entries(hexColors)) {
-        hexMaterials[key] = new THREE.MeshStandardMaterial({
-            color: hex, roughness: key === 'ocean' ? 0.3 : 0.8, metalness: key === 'ocean' ? 0.1 : 0.0, flatShading: true
+        const texture = hexTextures[key];
+        hexTopMaterials[key] = new THREE.MeshStandardMaterial({
+            color: texture ? '#ffffff' : hex,
+            map: texture || null,
+            roughness: 0.8,
+            metalness: 0.0,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
+            side: THREE.DoubleSide
         });
     }
+    const hexTransitionMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        map: hexTransitionTexture,
+        roughness: 0.85,
+        metalness: 0.0,
+        transparent: true,
+        alphaTest: 0.08,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
+        side: THREE.DoubleSide
+    });
 
     // Ocean plane (animated waves)
     const oceanGeo = new THREE.PlaneGeometry(800, 800, 60, 60);
     oceanGeo.rotateX(-Math.PI / 2);
-    const oceanMat = new THREE.MeshStandardMaterial({ color:'#0a6c9c', roughness:0.1, metalness:0.4, flatShading:true, transparent:true, opacity:0.85 });
+    const oceanMat = new THREE.MeshStandardMaterial({
+        color:'#8ed9eb',
+        map: oceanPlaneTexture,
+        roughness:0.35,
+        metalness:0.02,
+        flatShading:true,
+        transparent:true,
+        opacity:0.9
+    });
     const oceanPlane = new THREE.Mesh(oceanGeo, oceanMat);
     oceanPlane.position.y = -1.0;
     oceanPlane.receiveShadow = true;
@@ -396,8 +526,34 @@
     // ======== GEOMETRY CONSTANTS ========
     const hexSize = 7;
     const hexHeight = 1.8;
-    const hexGap = 1.02;
+    const hexGap = 1.0;
     const hexGeom = new THREE.CylinderGeometry(hexSize, hexSize, hexHeight, 6);
+    function createHexTopGeometry(radius) {
+        const vertices = [0, 0, 0];
+        const uvs = [0.5, 0.5];
+        for (let i = 0; i < 6; i++) {
+            const angle = (-Math.PI / 6) + (i * Math.PI / 3);
+            const x = radius * Math.cos(angle);
+            const z = radius * Math.sin(angle);
+            vertices.push(x, 0, z);
+            uvs.push((x / (radius * 2)) + 0.5, (z / (radius * 2)) + 0.5);
+        }
+
+        const indices = [];
+        for (let i = 1; i <= 6; i++) {
+            const next = i === 6 ? 1 : i + 1;
+            indices.push(0, next, i);
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        return geometry;
+    }
+    const hexTopGeom = createHexTopGeometry(hexSize * 0.985);
+    const hexTransitionGeom = createHexTopGeometry(hexSize * 1.012);
     const tokenGeom = new THREE.CylinderGeometry(2.5, 2.5, 0.4, 32);
     const roadGeo = new THREE.BoxGeometry(4.5, 0.8, 1);
     const houseBaseGeo = new THREE.BoxGeometry(2, 1.5, 2);
@@ -413,6 +569,8 @@
     const hlRobberMat = new THREE.MeshStandardMaterial({ color: 0xff0000, transparent: true, opacity: 0.4 });
     const reusableGeometries = new Set([
         hexGeom,
+        hexTopGeom,
+        hexTransitionGeom,
         tokenGeom,
         roadGeo,
         houseBaseGeo,
@@ -421,7 +579,10 @@
         cityTopGeo
     ]);
     const reusableMaterials = new Set([
-        ...Object.values(hexMaterials),
+        hexSideMat,
+        hexCapMat,
+        ...Object.values(hexTopMaterials),
+        hexTransitionMat,
         hlSettlementMat,
         hlRoadMat,
         hlCityMat,
@@ -539,12 +700,24 @@
 
     // ======== 3D RENDER FUNCTIONS ========
     function renderTile(x, z, resource, number, tileId) {
-        const mat = hexMaterials[resource] || hexMaterials.desert;
-        const mesh = new THREE.Mesh(hexGeom, mat);
+        const mesh = new THREE.Mesh(hexGeom, hexBodyMaterials);
         mesh.position.set(x, 0, z);
         mesh.castShadow = true; mesh.receiveShadow = true;
         mesh.userData = { type: 'tile', id: tileId };
         boardGroup.add(mesh);
+
+        const topMat = hexTopMaterials[resource] || hexTopMaterials.desert;
+        const resourceTop = new THREE.Mesh(hexTopGeom, topMat);
+        resourceTop.position.set(x, hexHeight / 2 + 0.012, z);
+        resourceTop.receiveShadow = true;
+        resourceTop.userData = { type: 'tile', id: tileId };
+        boardGroup.add(resourceTop);
+
+        const transition = new THREE.Mesh(hexTransitionGeom, hexTransitionMat);
+        transition.position.set(x, hexHeight / 2 + 0.025, z);
+        transition.receiveShadow = true;
+        transition.userData = { type: 'tile', id: tileId };
+        boardGroup.add(transition);
 
         if (number !== null && number !== undefined && resource !== 'desert') {
             const tokenMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: createTokenTexture(number), roughness: 0.5 });
@@ -553,23 +726,6 @@
             token.castShadow = true; token.receiveShadow = true;
             token.userData = { type: 'tile', id: tileId };
             boardGroup.add(token);
-        }
-    }
-
-    function renderOceanRing() {
-        const radius = 3;
-        for (let r = -radius; r <= radius; r++) {
-            let q1 = Math.max(-radius, -r - radius);
-            let q2 = Math.min(radius, -r + radius);
-            for (let q = q1; q <= q2; q++) {
-                if (Math.abs(q) === radius || Math.abs(r) === radius || Math.abs(-q - r) === radius) {
-                    const { x, z } = getHexPixelPos(q, r);
-                    const mesh = new THREE.Mesh(hexGeom, hexMaterials.ocean);
-                    mesh.position.set(x, 0, z);
-                    mesh.receiveShadow = true;
-                    boardGroup.add(mesh);
-                }
-            }
         }
     }
 
@@ -611,7 +767,7 @@
 
     function createRobber(x, z) {
         const robberGroup = new THREE.Group();
-        const mat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 });
+        const mat = new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.4 });
         const baseGeo = new THREE.CylinderGeometry(1.2, 1.5, 1, 16);
         const bodyGeo = new THREE.CylinderGeometry(0.8, 1.2, 2, 16);
         const headGeo = new THREE.SphereGeometry(0.9, 16, 16);
@@ -729,9 +885,6 @@
         GameState.tilePositions = computeTilePositions(board.tiles);
         GameState.vertexPositions = computeVertexPositions(board.tiles, GameState.tilePositions);
         GameState.edgePositions = computeEdgePositions(board.edges, GameState.vertexPositions);
-
-        // Ocean ring (decorative)
-        renderOceanRing();
 
         // Land tiles + tokens
         for (const tile of board.tiles) {
