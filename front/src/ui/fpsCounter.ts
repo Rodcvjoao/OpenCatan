@@ -1,4 +1,4 @@
-// Minimal FPS overlay. Updates once per second from the animate loop.
+// Minimal FPS overlay. Updates every 500 ms from the animate loop.
 // Toggle with the `F` key; default visible so you can measure right away.
 
 const ELEMENT_ID = "fps-counter";
