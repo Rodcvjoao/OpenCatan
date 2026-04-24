@@ -190,6 +190,7 @@
         vertexPositions: {},
         edgePositions: {},
         tilePositions: {},
+        tileNumbers: {},
         playerMap: {},
         interactionMode: 'none',
         pendingRobberTileId: null,
@@ -397,6 +398,12 @@
         hexTextures[key] = loadRepeatingTexture(path, 1, 1);
     }
     const hexTransitionTexture = loadClampedTexture('assets/textures/hex-transition-sand-ring.png');
+    const portPlankTexture = loadRepeatingTexture('assets/textures/port-plank-wood.png', 2, 1);
+    const portPoleTexture = loadRepeatingTexture('assets/textures/port-pole-wood.png', 1, 2);
+    const portCrateTexture = loadRepeatingTexture('assets/textures/crate.png', 1, 1);
+    const boatHullTexture = loadRepeatingTexture('assets/textures/boat-hull-painted-wood.png', 2, 1);
+    const boatDeckTexture = loadRepeatingTexture('assets/textures/boat-deck-light-wood.png', 2, 1);
+    const boatSailTexture = loadRepeatingTexture('assets/textures/boat-sail-canvas.png', 1, 1);
     const hexColors = {
         wood:'#3b5e2b', sheep:'#8ebd3f', wheat:'#f0c24f',
         brick:'#bd5a36', ore:'#82858c', desert:'#d6c596'
@@ -468,6 +475,51 @@
         flatShading: true
     });
     const hexBodyMaterials = [hexSideMat, hexCapMat, hexCapMat];
+    const portWoodMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        map: portPlankTexture,
+        roughness: 0.72,
+        metalness: 0.0
+    });
+    const portDarkWoodMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        map: portPoleTexture,
+        roughness: 0.78,
+        metalness: 0.0
+    });
+    const portStoneMat = new THREE.MeshStandardMaterial({ color: '#a99678', roughness: 0.85, metalness: 0.0 });
+    const portCrateMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        map: portCrateTexture,
+        roughness: 0.75,
+        metalness: 0.0
+    });
+    const boatHullMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        map: boatHullTexture,
+        roughness: 0.58,
+        metalness: 0.0
+    });
+    const boatTrimMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        map: boatDeckTexture,
+        roughness: 0.5,
+        metalness: 0.0
+    });
+    const boatCabinMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        map: boatDeckTexture,
+        roughness: 0.65,
+        metalness: 0.0
+    });
+    const boatFlagMat = new THREE.MeshStandardMaterial({ color: '#c45a3f', roughness: 0.55, metalness: 0.0, side: THREE.DoubleSide });
+    const sailMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        map: boatSailTexture,
+        roughness: 0.45,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+    });
     const hexTopMaterials = {};
     for (const [key, hex] of Object.entries(hexColors)) {
         const texture = hexTextures[key];
@@ -509,7 +561,7 @@
         opacity:0.9
     });
     const oceanPlane = new THREE.Mesh(oceanGeo, oceanMat);
-    oceanPlane.position.y = -1.0;
+    oceanPlane.position.y = -0.58;
     oceanPlane.receiveShadow = true;
     scene.add(oceanPlane);
     const basePositions = [];
@@ -522,6 +574,8 @@
     const boardGroup = new THREE.Group();
     scene.add(boardGroup);
     const dynamicTextures = new Set();
+    let floatingBoats = [];
+    let animatedSheep = [];
 
     // ======== GEOMETRY CONSTANTS ========
     const hexSize = 7;
@@ -561,6 +615,1128 @@
     houseRoofGeo.rotateY(Math.PI / 4);
     const cityBaseGeo = new THREE.BoxGeometry(2.8, 2, 2.8);
     const cityTopGeo = new THREE.BoxGeometry(1.6, 1.5, 1.6);
+    const portQuayGeo = new THREE.BoxGeometry(4.4, 0.32, 1.35);
+    const portPierGeo = new THREE.BoxGeometry(1.0, 0.24, 5.2);
+    const portPostHeight = 1.15;
+    const portPostGeo = new THREE.CylinderGeometry(0.14, 0.14, portPostHeight * 2, 8);
+    const portCrateGeo = new THREE.BoxGeometry(0.72, 0.5, 0.72);
+    function createBoatHullGeometry() {
+        const geometry = new THREE.BufferGeometry();
+        const vertices = [
+            -1.65,  0.22, -0.58,  -1.65,  0.22,  0.58,  -1.55, -0.26, -0.25,  -1.55, -0.26,  0.25,
+             0.45,  0.28, -0.74,   0.45,  0.28,  0.74,   0.45, -0.34, -0.28,   0.45, -0.34,  0.28,
+             1.95,  0.12,  0.00,   1.56, -0.18,  0.00
+        ];
+        const indices = [
+            0, 4, 6, 0, 6, 2,
+            1, 3, 7, 1, 7, 5,
+            2, 6, 7, 2, 7, 3,
+            0, 1, 5, 0, 5, 4,
+            4, 8, 9, 4, 9, 6,
+            5, 7, 9, 5, 9, 8,
+            6, 9, 7,
+            4, 5, 8,
+            0, 2, 3, 0, 3, 1
+        ];
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setAttribute('uv', new THREE.Float32BufferAttribute([
+            0.00, 0.12,  0.00, 0.88,  0.03, 0.32,  0.03, 0.68,
+            0.58, 0.02,  0.58, 0.98,  0.58, 0.30,  0.58, 0.70,
+            1.00, 0.50,  0.88, 0.50
+        ], 2));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        return geometry;
+    }
+    function createTriangleGeometry(points) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+        geometry.setAttribute('uv', new THREE.Float32BufferAttribute([
+            0, 0,
+            1, 0.5,
+            0, 1
+        ], 2));
+        geometry.setIndex([0, 1, 2]);
+        geometry.computeVertexNormals();
+        return geometry;
+    }
+    const boatHullGeo = createBoatHullGeometry();
+    const boatDeckGeo = new THREE.BoxGeometry(2.45, 0.12, 0.92);
+    const boatCabinGeo = new THREE.BoxGeometry(0.62, 0.34, 0.52);
+    const boatMastGeo = new THREE.CylinderGeometry(0.06, 0.08, 2.15, 10);
+    const boatSailGeo = createTriangleGeometry([0, 0, 0, 1.05, 0.86, 0, 0, 1.68, 0]);
+    const boatJibGeo = createTriangleGeometry([0, 0.05, 0, 0.78, 0.58, 0, 0, 1.26, 0]);
+    function createFlagGeometry() {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+            0, 0, 0,
+            0.42, 0.13, 0,
+            0, 0.28, 0
+        ], 3));
+        geometry.setAttribute('uv', new THREE.Float32BufferAttribute([
+            0, 0,
+            1, 0.5,
+            0, 1
+        ], 2));
+        geometry.setIndex([0, 1, 2]);
+        geometry.computeVertexNormals();
+        return geometry;
+    }
+
+    // ======== TREE (FOREST) GEOMETRY & MATERIALS ========
+    // Multiple low-poly tree species, shared geometries/materials for instancing.
+
+    // --- Trunks ---
+    const trunkSlimGeo = new THREE.CylinderGeometry(0.14, 0.20, 0.9, 6);
+    const trunkStandardGeo = new THREE.CylinderGeometry(0.18, 0.24, 0.9, 6);
+    const trunkThickGeo = new THREE.CylinderGeometry(0.24, 0.32, 1.1, 7);
+    const trunkTallGeo = new THREE.CylinderGeometry(0.15, 0.22, 1.4, 6);
+    const trunkStumpyGeo = new THREE.CylinderGeometry(0.22, 0.28, 0.55, 6);
+
+    // --- Foliage shapes ---
+    // Pine-cone layers (different sizes)
+    const foliageConeLargeGeo = new THREE.ConeGeometry(1.1, 1.4, 7);
+    const foliageConeMedGeo   = new THREE.ConeGeometry(0.95, 1.25, 7);
+    const foliageConeSmallGeo = new THREE.ConeGeometry(0.72, 1.1, 7);
+    const foliageConeTinyGeo  = new THREE.ConeGeometry(0.55, 0.95, 7);
+    // Tall narrow cypress-like cone
+    const foliageCypressGeo = new THREE.ConeGeometry(0.55, 2.4, 7);
+    // Round broadleaf crowns (icosahedrons give a nice faceted look)
+    const foliageRoundLargeGeo = new THREE.IcosahedronGeometry(0.95, 0);
+    const foliageRoundMedGeo   = new THREE.IcosahedronGeometry(0.72, 0);
+    const foliageRoundSmallGeo = new THREE.IcosahedronGeometry(0.55, 0);
+    // Bushy sphere-ish blobs
+    const foliageBlobGeo = new THREE.DodecahedronGeometry(0.7, 0);
+
+    // --- Trunk materials (a couple of bark shades) ---
+    const trunkBarkDarkMat = new THREE.MeshStandardMaterial({
+        color: '#4a2f1c', roughness: 0.95, metalness: 0.0, flatShading: true
+    });
+    const trunkBarkMidMat = new THREE.MeshStandardMaterial({
+        color: '#5a3a21', roughness: 0.95, metalness: 0.0, flatShading: true
+    });
+    const trunkBarkLightMat = new THREE.MeshStandardMaterial({
+        color: '#6e4a2a', roughness: 0.95, metalness: 0.0, flatShading: true
+    });
+    const trunkBirchMat = new THREE.MeshStandardMaterial({
+        color: '#d8d1c0', roughness: 0.85, metalness: 0.0, flatShading: true
+    });
+    const trunkMaterials = [trunkBarkDarkMat, trunkBarkMidMat, trunkBarkLightMat];
+
+    // Procedural leaf texture: seeded clusters of lighter "leaf" blobs over a
+    // darker base, plus speckles and shadow pockets. Each foliage material gets
+    // its own seeded variant so crowns don't look identical.
+    function createLeafTexture(baseColor, highlightColor, shadowColor, seed) {
+        const size = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        let s = (seed >>> 0) || 1;
+        function rand() {
+            s = (s + 0x9E3779B9) >>> 0;
+            let t = s;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        }
+
+        // Base fill (the darker "between leaves" tone).
+        ctx.fillStyle = baseColor;
+        ctx.fillRect(0, 0, size, size);
+
+        // Dark shadow pockets for depth between leaf clumps.
+        for (let i = 0; i < 45; i++) {
+            const cx = rand() * size;
+            const cy = rand() * size;
+            const r = 8 + rand() * 22;
+            const alpha = 0.12 + rand() * 0.18;
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+            grad.addColorStop(0, `rgba(0,0,0,${alpha})`);
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+        }
+
+        // Leaf clumps: many small soft circles of varied lightness.
+        const clumpCount = 260;
+        for (let i = 0; i < clumpCount; i++) {
+            const cx = rand() * size;
+            const cy = rand() * size;
+            const r = 3 + rand() * 7;
+            // Mix between base and highlight for each leaf.
+            const t = 0.4 + rand() * 0.6;
+            const alpha = 0.55 + rand() * 0.35;
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+            grad.addColorStop(0, mixRGBA(highlightColor, baseColor, 1 - t, alpha));
+            grad.addColorStop(0.6, mixRGBA(highlightColor, baseColor, (1 - t) * 0.5, alpha * 0.5));
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+        }
+
+        // Darker shadow speckles so the canopy isn't uniformly bright.
+        for (let i = 0; i < 180; i++) {
+            const x = rand() * size;
+            const y = rand() * size;
+            const r = 1 + rand() * 1.8;
+            ctx.fillStyle = mixRGBA(shadowColor, '#000000', 0.3, 0.35 + rand() * 0.3);
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        texture.encoding = THREE.sRGBEncoding;
+        texture.repeat.set(1, 1);
+        return texture;
+    }
+
+    // Helper: mix two hex colors and return an rgba() string.
+    function mixRGBA(colorA, colorB, tA, alpha) {
+        const a = hexToRgb(colorA);
+        const b = hexToRgb(colorB);
+        const r = Math.round(a.r * tA + b.r * (1 - tA));
+        const g = Math.round(a.g * tA + b.g * (1 - tA));
+        const bb = Math.round(a.b * tA + b.b * (1 - tA));
+        return `rgba(${r},${g},${bb},${alpha})`;
+    }
+    function hexToRgb(hex) {
+        const h = hex.replace('#', '');
+        return {
+            r: parseInt(h.slice(0, 2), 16),
+            g: parseInt(h.slice(2, 4), 16),
+            b: parseInt(h.slice(4, 6), 16)
+        };
+    }
+
+    // Generate one leaf texture per foliage variant (color palette = base/highlight/shadow).
+    const leafTextureDeep   = createLeafTexture('#1f4520', '#4a7a30', '#0f2a13', 111);
+    const leafTexturePine   = createLeafTexture('#2f5a26', '#5d8a3a', '#173318', 222);
+    const leafTextureMid    = createLeafTexture('#3c7a33', '#78b04c', '#1f4420', 333);
+    const leafTextureLight  = createLeafTexture('#5a9a3e', '#9ec860', '#2f5a22', 444);
+    const leafTextureOlive  = createLeafTexture('#6e7f2a', '#a5b046', '#3f4715', 555);
+    const leafTextureAutumn = createLeafTexture('#b8651f', '#e89548', '#5c2a10', 666);
+    const leafTextureYellow = createLeafTexture('#c69a2a', '#f0c85a', '#6a4e12', 777);
+
+    // --- Foliage materials (varied greens + a couple of seasonal accents) ---
+    // Each foliage shade uses its own procedural leaf texture. Base color is
+    // white so the texture's baked-in tint drives the final color.
+    const foliageDeepMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff', map: leafTextureDeep,
+        roughness: 0.85, metalness: 0.0, flatShading: true
+    });
+    const foliagePineMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff', map: leafTexturePine,
+        roughness: 0.85, metalness: 0.0, flatShading: true
+    });
+    const foliageMidMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff', map: leafTextureMid,
+        roughness: 0.85, metalness: 0.0, flatShading: true
+    });
+    const foliageLightMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff', map: leafTextureLight,
+        roughness: 0.85, metalness: 0.0, flatShading: true
+    });
+    const foliageOliveMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff', map: leafTextureOlive,
+        roughness: 0.9, metalness: 0.0, flatShading: true
+    });
+    const foliageAutumnMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff', map: leafTextureAutumn,
+        roughness: 0.9, metalness: 0.0, flatShading: true
+    });
+    const foliageYellowMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff', map: leafTextureYellow,
+        roughness: 0.9, metalness: 0.0, flatShading: true
+    });
+    // Weighted list (more greens than autumns so the forest still reads as lush)
+    const foliageGreenMats = [
+        foliageDeepMat, foliageDeepMat,
+        foliagePineMat, foliagePineMat, foliagePineMat,
+        foliageMidMat, foliageMidMat,
+        foliageLightMat,
+        foliageOliveMat
+    ];
+    const foliageAccentMats = [foliageAutumnMat, foliageYellowMat];
+
+    // Deterministic RNG so trees don't jump between re-renders of the same tile.
+    function mulberry32(seed) {
+        let s = seed >>> 0;
+        return function () {
+            s = (s + 0x6D2B79F5) >>> 0;
+            let t = s;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    function pickFoliageMat(rand) {
+        // ~8% chance of an autumn/yellow accent tree.
+        if (rand() < 0.08) {
+            return foliageAccentMats[Math.floor(rand() * foliageAccentMats.length)];
+        }
+        return foliageGreenMats[Math.floor(rand() * foliageGreenMats.length)];
+    }
+
+    // ---- Tree species builders ----
+    // Each returns a Group local-origin at (0,0,0) with trunk base on the ground.
+
+    // Classic stacked-cone pine.
+    function buildPineTree(rand) {
+        const group = new THREE.Group();
+        const trunkMat = trunkMaterials[Math.floor(rand() * trunkMaterials.length)];
+        const trunk = new THREE.Mesh(trunkStandardGeo, trunkMat);
+        trunk.position.y = 0.45;
+        trunk.castShadow = true; trunk.receiveShadow = true;
+        group.add(trunk);
+
+        const foliageMat = pickFoliageMat(rand);
+        const bottom = new THREE.Mesh(foliageConeMedGeo, foliageMat);
+        bottom.position.y = 1.35;
+        bottom.castShadow = true; bottom.receiveShadow = true;
+        group.add(bottom);
+
+        const top = new THREE.Mesh(foliageConeSmallGeo, foliageMat);
+        top.position.y = 2.15;
+        top.castShadow = true; top.receiveShadow = true;
+        group.add(top);
+        return group;
+    }
+
+    // Three-layer tall pine (bigger silhouette).
+    function buildTallPineTree(rand) {
+        const group = new THREE.Group();
+        const trunk = new THREE.Mesh(trunkTallGeo, trunkMaterials[Math.floor(rand() * trunkMaterials.length)]);
+        trunk.position.y = 0.7;
+        trunk.castShadow = true; trunk.receiveShadow = true;
+        group.add(trunk);
+
+        const foliageMat = pickFoliageMat(rand);
+        const l1 = new THREE.Mesh(foliageConeLargeGeo, foliageMat);
+        l1.position.y = 1.65; l1.castShadow = true; l1.receiveShadow = true;
+        group.add(l1);
+        const l2 = new THREE.Mesh(foliageConeMedGeo, foliageMat);
+        l2.position.y = 2.45; l2.castShadow = true; l2.receiveShadow = true;
+        group.add(l2);
+        const l3 = new THREE.Mesh(foliageConeTinyGeo, foliageMat);
+        l3.position.y = 3.15; l3.castShadow = true; l3.receiveShadow = true;
+        group.add(l3);
+        return group;
+    }
+
+    // Narrow tall cypress-like cone.
+    function buildCypressTree(rand) {
+        const group = new THREE.Group();
+        const trunk = new THREE.Mesh(trunkSlimGeo, trunkMaterials[Math.floor(rand() * trunkMaterials.length)]);
+        trunk.position.y = 0.45;
+        trunk.castShadow = true; trunk.receiveShadow = true;
+        group.add(trunk);
+
+        const crown = new THREE.Mesh(foliageCypressGeo, pickFoliageMat(rand));
+        crown.position.y = 2.05;
+        crown.castShadow = true; crown.receiveShadow = true;
+        group.add(crown);
+        return group;
+    }
+
+    // Round broadleaf tree (icosahedron crown).
+    function buildBroadleafTree(rand) {
+        const group = new THREE.Group();
+        const trunk = new THREE.Mesh(trunkThickGeo, trunkMaterials[Math.floor(rand() * trunkMaterials.length)]);
+        trunk.position.y = 0.55;
+        trunk.castShadow = true; trunk.receiveShadow = true;
+        group.add(trunk);
+
+        const foliageMat = pickFoliageMat(rand);
+        const crown = new THREE.Mesh(foliageRoundLargeGeo, foliageMat);
+        crown.position.y = 1.7;
+        crown.rotation.y = rand() * Math.PI;
+        crown.castShadow = true; crown.receiveShadow = true;
+        group.add(crown);
+
+        // Occasionally add a secondary clump to make it look fuller.
+        if (rand() < 0.55) {
+            const extra = new THREE.Mesh(foliageRoundSmallGeo, foliageMat);
+            extra.position.set((rand() - 0.5) * 0.7, 1.95 + rand() * 0.25, (rand() - 0.5) * 0.7);
+            extra.castShadow = true; extra.receiveShadow = true;
+            group.add(extra);
+        }
+        return group;
+    }
+
+    // Birch-like: pale trunk, light foliage.
+    function buildBirchTree(rand) {
+        const group = new THREE.Group();
+        const trunk = new THREE.Mesh(trunkTallGeo, trunkBirchMat);
+        trunk.position.y = 0.7;
+        trunk.castShadow = true; trunk.receiveShadow = true;
+        group.add(trunk);
+
+        const foliageMat = rand() < 0.25 ? foliageYellowMat : foliageLightMat;
+        const crown = new THREE.Mesh(foliageRoundMedGeo, foliageMat);
+        crown.position.y = 1.85;
+        crown.castShadow = true; crown.receiveShadow = true;
+        group.add(crown);
+
+        if (rand() < 0.5) {
+            const extra = new THREE.Mesh(foliageRoundSmallGeo, foliageMat);
+            extra.position.set((rand() - 0.5) * 0.55, 2.1, (rand() - 0.5) * 0.55);
+            extra.castShadow = true; extra.receiveShadow = true;
+            group.add(extra);
+        }
+        return group;
+    }
+
+    // Bushy squat tree (no visible trunk).
+    function buildBushyTree(rand) {
+        const group = new THREE.Group();
+        const trunk = new THREE.Mesh(trunkStumpyGeo, trunkMaterials[Math.floor(rand() * trunkMaterials.length)]);
+        trunk.position.y = 0.28;
+        trunk.castShadow = true; trunk.receiveShadow = true;
+        group.add(trunk);
+
+        const foliageMat = pickFoliageMat(rand);
+        const blobCount = 2 + Math.floor(rand() * 3);
+        for (let i = 0; i < blobCount; i++) {
+            const blob = new THREE.Mesh(foliageBlobGeo, foliageMat);
+            const angle = rand() * Math.PI * 2;
+            const r = rand() * 0.45;
+            blob.position.set(Math.cos(angle) * r, 0.85 + rand() * 0.5, Math.sin(angle) * r);
+            const s = 0.75 + rand() * 0.45;
+            blob.scale.setScalar(s);
+            blob.rotation.y = rand() * Math.PI * 2;
+            blob.castShadow = true; blob.receiveShadow = true;
+            group.add(blob);
+        }
+        return group;
+    }
+
+    // Tiny sapling to dot between larger trees.
+    function buildSaplingTree(rand) {
+        const group = new THREE.Group();
+        const trunk = new THREE.Mesh(trunkSlimGeo, trunkMaterials[Math.floor(rand() * trunkMaterials.length)]);
+        trunk.scale.y = 0.6;
+        trunk.position.y = 0.27;
+        trunk.castShadow = true; trunk.receiveShadow = true;
+        group.add(trunk);
+
+        const crown = new THREE.Mesh(foliageConeTinyGeo, pickFoliageMat(rand));
+        crown.position.y = 0.95;
+        crown.castShadow = true; crown.receiveShadow = true;
+        group.add(crown);
+        return group;
+    }
+
+    const treeBuilders = [
+        { build: buildPineTree,     weight: 3 },
+        { build: buildTallPineTree, weight: 2 },
+        { build: buildCypressTree,  weight: 1 },
+        { build: buildBroadleafTree, weight: 2 },
+        { build: buildBirchTree,    weight: 1 },
+        { build: buildBushyTree,    weight: 2 },
+        { build: buildSaplingTree,  weight: 1 }
+    ];
+    const treeBuilderTotalWeight = treeBuilders.reduce((s, b) => s + b.weight, 0);
+    function pickTreeBuilder(rand) {
+        let r = rand() * treeBuilderTotalWeight;
+        for (const b of treeBuilders) {
+            r -= b.weight;
+            if (r <= 0) return b.build;
+        }
+        return treeBuilders[0].build;
+    }
+
+    function createTreeMesh(scale, rand) {
+        const group = pickTreeBuilder(rand)(rand);
+        // Slight non-uniform scaling for more silhouette variety.
+        const sx = scale * (0.92 + rand() * 0.16);
+        const sy = scale * (0.92 + rand() * 0.22);
+        const sz = scale * (0.92 + rand() * 0.16);
+        group.scale.set(sx, sy, sz);
+        // Tiny tilt so the trees don't all look soldier-straight.
+        const tiltAmt = 0.06;
+        group.rotation.x = (rand() - 0.5) * tiltAmt;
+        group.rotation.z = (rand() - 0.5) * tiltAmt;
+        return group;
+    }
+
+    // Builds a cluster of trees on top of a forest (wood) tile.
+    function createForestCluster(tileId) {
+        const cluster = new THREE.Group();
+        // Use tile id as seed for reproducible placement.
+        let seed = 1;
+        if (typeof tileId === 'number') {
+            seed = (tileId * 2654435761) >>> 0;
+        } else if (typeof tileId === 'string') {
+            for (let i = 0; i < tileId.length; i++) {
+                seed = (Math.imul(seed, 31) + tileId.charCodeAt(i)) >>> 0;
+            }
+        }
+        const rand = mulberry32(seed || 1);
+
+        const treeCount = 22;
+        const placed = [];
+        // Keep trees away from the hex edges. The hex is pointy-top, so its
+        // edges have inward normals at angles 60*i degrees and sit at a
+        // distance `apothem = hexSize * cos(30deg)` from the center.
+        const apothem = hexSize * Math.cos(Math.PI / 6);
+        const edgeInset = 1.2;                   // world units to keep off the flat edges
+        const maxEdgeDist = apothem - edgeInset; // max signed distance to any edge
+        const maxRadius = hexSize - edgeInset;   // corner safety (corners are at `hexSize`)
+        const minRadius = 0.0;
+        const minSeparation = 0.95;
+
+        function insideHexInset(x, z) {
+            for (let i = 0; i < 6; i++) {
+                const theta = (i * Math.PI) / 3; // 0, 60, 120, ... degrees
+                const d = x * Math.cos(theta) + z * Math.sin(theta);
+                if (d > maxEdgeDist || d < -maxEdgeDist) return false;
+            }
+            return true;
+        }
+
+        let attempts = 0;
+        while (placed.length < treeCount && attempts < 600) {
+            attempts++;
+            const angle = rand() * Math.PI * 2;
+            const radius = minRadius + rand() * (maxRadius - minRadius);
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+
+            if (!insideHexInset(x, z)) continue;
+
+            let tooClose = false;
+            for (const p of placed) {
+                const dx = p.x - x;
+                const dz = p.z - z;
+                if (dx * dx + dz * dz < minSeparation * minSeparation) {
+                    tooClose = true;
+                    break;
+                }
+            }
+            if (tooClose) continue;
+
+            const scale = 0.7 + rand() * 0.55;
+            const tree = createTreeMesh(scale, rand);
+            tree.position.set(x, 0, z);
+            tree.rotation.y = rand() * Math.PI * 2;
+            cluster.add(tree);
+            placed.push({ x, z });
+        }
+        return cluster;
+    }
+
+    // ======== MOUNTAIN (ORE) GEOMETRY & MATERIALS ========
+    // Low-poly faceted cones with snow caps, built on a shared palette of
+    // rock shades so each ore tile reads as a small alpine ridge.
+
+    // Procedural rock texture: seeded value-noise + a few darker striations and
+    // bright speckles so flat-shaded facets still feel like stone under light.
+    function createRockTexture(baseColor, seed) {
+        const size = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // Deterministic RNG so each material gets a different-but-stable pattern.
+        let s = (seed >>> 0) || 1;
+        function rand() {
+            s = (s + 0x9E3779B9) >>> 0;
+            let t = s;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        }
+
+        // Fill with the base color.
+        ctx.fillStyle = baseColor;
+        ctx.fillRect(0, 0, size, size);
+
+        // Low-frequency mottling: scatter large-ish soft blobs in darker/lighter
+        // shades to break up the flat color.
+        const blobCount = 140;
+        for (let i = 0; i < blobCount; i++) {
+            const cx = rand() * size;
+            const cy = rand() * size;
+            const r = 10 + rand() * 38;
+            const dark = rand() > 0.5;
+            const alpha = 0.06 + rand() * 0.12;
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+            grad.addColorStop(0, dark
+                ? `rgba(0,0,0,${alpha})`
+                : `rgba(255,255,255,${alpha})`);
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+        }
+
+        // Striations: a few thin dark streaks to read as rock strata.
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 18; i++) {
+            const y = rand() * size;
+            const amp = 6 + rand() * 14;
+            const phase = rand() * Math.PI * 2;
+            const alpha = 0.08 + rand() * 0.12;
+            ctx.strokeStyle = `rgba(0,0,0,${alpha})`;
+            ctx.lineWidth = 1 + rand() * 1.8;
+            ctx.beginPath();
+            for (let x = 0; x <= size; x += 8) {
+                const yy = y + Math.sin(x * 0.04 + phase) * amp;
+                if (x === 0) ctx.moveTo(x, yy);
+                else ctx.lineTo(x, yy);
+            }
+            ctx.stroke();
+        }
+
+        // Tiny speckles (mineral glints / pebbles).
+        for (let i = 0; i < 320; i++) {
+            const x = rand() * size;
+            const y = rand() * size;
+            const bright = rand() > 0.65;
+            const a = 0.15 + rand() * 0.35;
+            ctx.fillStyle = bright ? `rgba(255,246,220,${a})` : `rgba(0,0,0,${a * 0.8})`;
+            ctx.fillRect(x, y, 1 + Math.floor(rand() * 2), 1 + Math.floor(rand() * 2));
+        }
+
+        // Subtle cracks: short dark line segments.
+        for (let i = 0; i < 28; i++) {
+            const x = rand() * size;
+            const y = rand() * size;
+            const len = 8 + rand() * 22;
+            const ang = rand() * Math.PI * 2;
+            ctx.strokeStyle = `rgba(0,0,0,${0.18 + rand() * 0.2})`;
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+            ctx.stroke();
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        texture.encoding = THREE.sRGBEncoding;
+        // The mountain geometry has a short vertical UV range (0 .. ~1) across
+        // a tall mesh, so repeat vertically so strata look the right scale.
+        texture.repeat.set(1.5, 2.2);
+        return texture;
+    }
+
+    const rockTextureDark  = createRockTexture('#4b4e55', 101);
+    const rockTextureMid   = createRockTexture('#6a6d74', 202);
+    const rockTextureLight = createRockTexture('#8a8c92', 303);
+    const rockTextureWarm  = createRockTexture('#746459', 404);
+
+    const rockDarkMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff', map: rockTextureDark,
+        roughness: 0.95, metalness: 0.0, flatShading: true
+    });
+    const rockMidMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff', map: rockTextureMid,
+        roughness: 0.92, metalness: 0.0, flatShading: true
+    });
+    const rockLightMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff', map: rockTextureLight,
+        roughness: 0.9, metalness: 0.0, flatShading: true
+    });
+    const rockWarmMat = new THREE.MeshStandardMaterial({
+        color: '#ffffff', map: rockTextureWarm,
+        roughness: 0.95, metalness: 0.0, flatShading: true
+    });
+    const snowMat = new THREE.MeshStandardMaterial({
+        color: '#f3f4f7', roughness: 0.7, metalness: 0.0, flatShading: true
+    });
+    const rockMaterials = [rockDarkMat, rockMidMat, rockLightMat, rockWarmMat];
+
+    // Shared mountain size specs. Actual peak geometries are generated per peak
+    // so their bases can remain closed and flat while silhouettes vary.
+    // shoulderFrac = shoulder ring height as fraction of total height.
+    // shoulderScale = shoulder ring radius as fraction of base radius.
+    // The snow cap sits on the shoulder ring, so cap.radius == shoulderRadius
+    // and cap.height == (1 - shoulderFrac) * height. This guarantees the cap's
+    // base matches the rock's cross-section at the same height.
+    const mountainLargeSpec = { radius: 2.7, height: 4.05, shoulderFrac: 0.44, shoulderScale: 0.5 };
+    const mountainMedSpec   = { radius: 2.15, height: 3.18, shoulderFrac: 0.44, shoulderScale: 0.5 };
+    const mountainSmallSpec = { radius: 1.55, height: 2.25, shoulderFrac: 0.44, shoulderScale: 0.5 };
+    const mountainTallSpec  = { radius: 2.1, height: 4.7,  shoulderFrac: 0.48, shoulderScale: 0.48 };
+    const boulderGeo = new THREE.DodecahedronGeometry(0.5, 0);
+    const boulderSmallGeo = new THREE.IcosahedronGeometry(0.34, 0);
+
+    function createClosedMountainGeometry(spec, rand) {
+        const sides = 6;
+        const base = [];
+        const shoulder = [];
+        const vertices = [0, 0, 0]; // base center, used by the cap fan
+        const uvs = [0.5, 0.5];
+
+        // Precompute mean shoulder Y & radius used by the snow cap.
+        const meanShoulderY = spec.height * spec.shoulderFrac;
+        const meanShoulderR = spec.radius * spec.shoulderScale;
+
+        for (let i = 0; i < sides; i++) {
+            const angle = (-Math.PI / 6) + (i * Math.PI * 2) / sides;
+            const baseRadius = spec.radius * (0.94 + rand() * 0.12);
+            // Small per-vertex jitter around the mean so the silhouette stays
+            // lively, but doesn't grow past the cap's footprint.
+            const shoulderRadius = meanShoulderR * (0.92 + rand() * 0.12);
+            const shoulderY = meanShoulderY * (0.96 + rand() * 0.08);
+            const bx = Math.cos(angle) * baseRadius;
+            const bz = Math.sin(angle) * baseRadius;
+            const sx = Math.cos(angle + (rand() - 0.5) * 0.035) * shoulderRadius;
+            const sz = Math.sin(angle + (rand() - 0.5) * 0.035) * shoulderRadius;
+            // Cylindrical UVs: U goes around the mountain, V from base->apex.
+            // Shoulder V matches shoulderFrac so the strata stay proportional.
+            const u = i / sides;
+            const baseIndex = vertices.length / 3;
+            vertices.push(bx, 0, bz);
+            uvs.push(u, 0);
+            const shoulderIndex = vertices.length / 3;
+            vertices.push(sx, shoulderY, sz);
+            uvs.push(u, spec.shoulderFrac);
+            base.push(baseIndex);
+            shoulder.push(shoulderIndex);
+        }
+
+        // Apex position (slightly offset for personality). We return the offset
+        // so the snow cap can share it and stay perfectly aligned with the tip.
+        const apexOffsetX = (rand() - 0.5) * spec.radius * 0.08;
+        const apexOffsetZ = (rand() - 0.5) * spec.radius * 0.08;
+        const apexIndex = vertices.length / 3;
+        vertices.push(apexOffsetX, spec.height, apexOffsetZ);
+        uvs.push(0.5, 1);
+
+        const indices = [];
+        for (let i = 0; i < sides; i++) {
+            const next = (i + 1) % sides;
+            // Closed base cap.
+            indices.push(0, base[i], base[next]);
+            // Lower rock band.
+            indices.push(base[i], shoulder[next], base[next]);
+            indices.push(base[i], shoulder[i], shoulder[next]);
+            // Upper peak faces.
+            indices.push(shoulder[i], apexIndex, shoulder[next]);
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        return { geometry, apexOffsetX, apexOffsetZ };
+    }
+
+    function createSnowCapGeometry(spec, apexOffsetX, apexOffsetZ) {
+        const sides = 6;
+        // Match the mountain's shoulder so the cap base aligns with the rock,
+        // then push the cap outward so it visibly wraps the rock edge
+        // instead of fighting for the same surface (z-fighting).
+        const capBaseRadius = spec.radius * spec.shoulderScale + 0.08;
+        const capHeight = spec.height * (1 - spec.shoulderFrac);
+        const vertices = [0, 0, 0];
+        const uvs = [0.5, 0.5];
+        // Perfectly regular hexagonal rim so the cap is visually concentric
+        // with the mountain's shoulder (which uses the same angular step).
+        for (let i = 0; i < sides; i++) {
+            const angle = (-Math.PI / 6) + (i * Math.PI * 2) / sides;
+            vertices.push(Math.cos(angle) * capBaseRadius, 0, Math.sin(angle) * capBaseRadius);
+            uvs.push((Math.cos(angle) + 1) / 2, (Math.sin(angle) + 1) / 2);
+        }
+        const apexIndex = sides + 1;
+        // Use the exact same apex offset as the mountain so the snow tip sits
+        // on the rock tip, not beside it.
+        vertices.push(apexOffsetX, capHeight, apexOffsetZ);
+        uvs.push(0.5, 1);
+
+        const indices = [];
+        for (let i = 1; i <= sides; i++) {
+            const next = i === sides ? 1 : i + 1;
+            indices.push(0, i, next);
+            indices.push(i, apexIndex, next);
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        return geometry;
+    }
+
+    // Builds a single mountain peak with an optional snow cap.
+    function buildMountainPeak(rand, sizeVariant) {
+        const group = new THREE.Group();
+
+        let spec, baseScale;
+        if (sizeVariant === 'large') {
+            spec = mountainLargeSpec; baseScale = 1.0;
+        } else if (sizeVariant === 'tall') {
+            spec = mountainTallSpec; baseScale = 1.0;
+        } else if (sizeVariant === 'small') {
+            spec = mountainSmallSpec; baseScale = 1.0;
+        } else {
+            spec = mountainMedSpec; baseScale = 1.0;
+        }
+
+        const { geometry: peakGeo, apexOffsetX, apexOffsetZ } = createClosedMountainGeometry(spec, rand);
+        const rockMat = rockMaterials[Math.floor(rand() * rockMaterials.length)];
+        const peak = new THREE.Mesh(peakGeo, rockMat);
+        const peakRotY = rand() * Math.PI * 2;
+        peak.rotation.y = peakRotY;
+        peak.castShadow = true; peak.receiveShadow = true;
+        group.add(peak);
+
+        // Snow cap (probability depends on size). The cap shares the mountain's
+        // shoulder radius and apex offset, so it sits concentric with the rock
+        // and its tip lands exactly on the mountain's tip.
+        const snowChance = sizeVariant === 'small' ? 0.3 : 0.75;
+        if (rand() < snowChance) {
+            const capGeo = createSnowCapGeometry(spec, apexOffsetX, apexOffsetZ);
+            const cap = new THREE.Mesh(capGeo, snowMat);
+            // Seat the cap on the shoulder. Its base radius is slightly larger
+            // than the rock's, so the snow wraps the rock edge without z-fight.
+            cap.position.y = spec.height * spec.shoulderFrac;
+            // Match peak rotation so facet edges align.
+            cap.rotation.y = peakRotY;
+            cap.castShadow = true; cap.receiveShadow = true;
+            group.add(cap);
+        }
+
+        // Slight non-uniform scaling for silhouette variety.
+        const sx = baseScale * (0.92 + rand() * 0.18);
+        const sy = baseScale * (0.94 + rand() * 0.2);
+        const sz = baseScale * (0.92 + rand() * 0.18);
+        group.scale.set(sx, sy, sz);
+        group.userData.apexY = spec.height * sy;
+
+        return { group, disposableGeo: peakGeo };
+    }
+
+    function buildBoulder(rand, small) {
+        const geo = small ? boulderSmallGeo : boulderGeo;
+        const mat = rockMaterials[Math.floor(rand() * rockMaterials.length)];
+        const m = new THREE.Mesh(geo, mat);
+        const s = (small ? 0.45 : 0.62) + rand() * 0.35;
+        m.scale.set(s * (0.8 + rand() * 0.5), s * (0.7 + rand() * 0.5), s * (0.8 + rand() * 0.5));
+        m.rotation.set(rand() * Math.PI, rand() * Math.PI, rand() * Math.PI);
+        m.position.y = s * 0.25;
+        m.castShadow = true; m.receiveShadow = true;
+        return m;
+    }
+
+    // Builds a cluster of mountains on top of an ore tile.
+    function createMountainCluster(tileId) {
+        const cluster = new THREE.Group();
+        let seed = 7919;
+        if (typeof tileId === 'number') {
+            seed = (tileId * 2246822519) >>> 0;
+        } else if (typeof tileId === 'string') {
+            for (let i = 0; i < tileId.length; i++) {
+                seed = (Math.imul(seed, 17) + tileId.charCodeAt(i)) >>> 0;
+            }
+        }
+        const rand = mulberry32(seed || 1);
+
+        // Stay off the flat hex edges (same approach as the forest).
+        const apothem = hexSize * Math.cos(Math.PI / 6);
+        const edgeInset = 1.6;
+        const maxEdgeDist = apothem - edgeInset;
+        const maxRadius = hexSize - edgeInset;
+
+        function insideHexInset(x, z) {
+            for (let i = 0; i < 6; i++) {
+                const theta = (i * Math.PI) / 3;
+                const d = x * Math.cos(theta) + z * Math.sin(theta);
+                if (d > maxEdgeDist || d < -maxEdgeDist) return false;
+            }
+            return true;
+        }
+
+        const ridgeAngle = rand() * Math.PI * 2;
+        const ridgeX = Math.cos(ridgeAngle);
+        const ridgeZ = Math.sin(ridgeAngle);
+        const sideX = -ridgeZ;
+        const sideZ = ridgeX;
+        const ridgeSlots = [
+            { t: -2.65, side: -0.25, variant: 'small' },
+            { t: -1.5, side: 0.25, variant: 'med' },
+            { t: -0.2, side: -0.05, variant: 'tall' },
+            { t: 1.15, side: -0.2, variant: 'large' },
+            { t: 2.35, side: 0.22, variant: 'small' },
+            { t: 0.85, side: 1.0, variant: 'small' }
+        ];
+        // Base radius for each variant (must stay in sync with the specs above).
+        const variantRadius = {
+            small: mountainSmallSpec.radius,
+            med:   mountainMedSpec.radius,
+            tall:  mountainTallSpec.radius,
+            large: mountainLargeSpec.radius
+        };
+        // How much peaks are allowed to interpenetrate: at 1.0 their base rings
+        // just touch, at <1 they overlap proportionally. 0.72 keeps the ridge
+        // reading as one continuous mass without any peak sitting inside another.
+        const overlapFactor = 0.72;
+
+        const peakPositions = [];
+        for (const slot of ridgeSlots) {
+            const jitterT = (rand() - 0.5) * 0.35;
+            const jitterSide = (rand() - 0.5) * 0.35;
+            const x = ridgeX * (slot.t + jitterT) + sideX * (slot.side + jitterSide);
+            const z = ridgeZ * (slot.t + jitterT) + sideZ * (slot.side + jitterSide);
+            if (!insideHexInset(x, z)) continue;
+
+            const slotRadius = variantRadius[slot.variant];
+            // Reject if this peak's base would sit too deeply inside another peak.
+            let overlapsExisting = false;
+            for (const p of peakPositions) {
+                const dx = p.x - x;
+                const dz = p.z - z;
+                const minDist = (p.radius + slotRadius) * overlapFactor;
+                if (dx * dx + dz * dz < minDist * minDist) {
+                    overlapsExisting = true;
+                    break;
+                }
+            }
+            if (overlapsExisting) continue;
+
+            const { group: peak } = buildMountainPeak(rand, slot.variant);
+            peak.position.set(x, 0, z);
+            peak.rotation.y += ridgeAngle + (rand() - 0.5) * 0.5;
+            cluster.add(peak);
+            peakPositions.push({ x, z, radius: slotRadius });
+        }
+
+        // Scatter boulders in the gaps for extra texture.
+        const boulderCount = 7 + Math.floor(rand() * 4);
+        const placedBoulders = [];
+        const boulderMinSep = 1.0;
+        let bAttempts = 0;
+        while (placedBoulders.length < boulderCount && bAttempts < 160) {
+            bAttempts++;
+            const angle = rand() * Math.PI * 2;
+            const radius = rand() * maxRadius * 0.82;
+            const x = Math.cos(angle) * radius;
+            const z = Math.sin(angle) * radius;
+            if (!insideHexInset(x, z)) continue;
+
+            // Don't drop boulders right under a peak base (bases vary per variant).
+            let onPeak = false;
+            for (const p of peakPositions) {
+                const dx = p.x - x, dz = p.z - z;
+                const keepOut = (p.radius || 2.0) * 0.9;
+                if (dx * dx + dz * dz < keepOut * keepOut) { onPeak = true; break; }
+            }
+            if (onPeak) continue;
+
+            let tooClose = false;
+            for (const p of placedBoulders) {
+                const dx = p.x - x, dz = p.z - z;
+                if (dx * dx + dz * dz < boulderMinSep * boulderMinSep) {
+                    tooClose = true; break;
+                }
+            }
+            if (tooClose) continue;
+
+            const boulder = buildBoulder(rand, rand() < 0.5);
+            boulder.position.x = x;
+            boulder.position.z = z;
+            cluster.add(boulder);
+            placedBoulders.push({ x, z });
+        }
+
+        return cluster;
+    }
+
+    // ======== PASTURE (SHEEP) GEOMETRY & MATERIALS ========
+    // Little sheep wander inside a hex-shaped fence. A tiny farmhouse sits
+    // on the grass outside the fence to sell the pastoral vibe.
+
+    // Sheep body parts, Gemini's proportions. Each sheep is uniformly scaled
+    // down (see SHEEP_SCALE) so ~5 of them fit comfortably on a hex tile.
+    const sheepBodyGeo = new THREE.BoxGeometry(2.2, 2.2, 3.0);
+    const sheepHeadGeo = new THREE.BoxGeometry(0.7, 0.8, 1.2);
+    const sheepEyeGeo = new THREE.SphereGeometry(0.08, 8, 8);
+    const sheepEarGeo = new THREE.BoxGeometry(0.15, 0.3, 0.15);
+    const sheepLegGeo = new THREE.CylinderGeometry(0.12, 0.1, 1.2, 8);
+    const SHEEP_SCALE = 0.28;
+
+    // Materials
+    const sheepWoolMat = new THREE.MeshStandardMaterial({
+        color: '#f4f4f4', roughness: 1.0, metalness: 0.0, flatShading: true
+    });
+    const sheepWoolDarkMat = new THREE.MeshStandardMaterial({
+        color: '#dcdcdc', roughness: 1.0, metalness: 0.0, flatShading: true
+    });
+    const sheepFaceMat = new THREE.MeshStandardMaterial({
+        color: '#222222', roughness: 0.5, metalness: 0.0, flatShading: true
+    });
+    const sheepEyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    // Kept for backwards compat with the reusable-materials set; no longer used.
+    const sheepDarkMat = sheepFaceMat;
+
+    // Builds one sheep as a Group centered on origin, facing local +Z.
+    // The returned Group is uniformly scaled so 1 world unit ~ one sheep body.
+    function buildSheep(rand) {
+        const sheep = new THREE.Group();
+        const isDarkWool = rand() < 0.2;
+        const woolMat = isDarkWool ? sheepWoolDarkMat : sheepWoolMat;
+
+        // Body group (bounces vertically while walking).
+        const bodyGroup = new THREE.Group();
+        sheep.add(bodyGroup);
+
+        const body = new THREE.Mesh(sheepBodyGeo, woolMat);
+        body.position.y = 1.8;
+        body.castShadow = true; body.receiveShadow = true;
+        bodyGroup.add(body);
+
+        // Head group (rotates down / lowers while grazing).
+        const headGroup = new THREE.Group();
+        headGroup.position.set(0, 2.3, 1.6);
+        bodyGroup.add(headGroup);
+
+        const head = new THREE.Mesh(sheepHeadGeo, sheepFaceMat);
+        head.castShadow = true;
+        headGroup.add(head);
+
+        const leftEye = new THREE.Mesh(sheepEyeGeo, sheepEyeMat);
+        leftEye.position.set(-0.35, 0.2, 0.4);
+        headGroup.add(leftEye);
+
+        const rightEye = new THREE.Mesh(sheepEyeGeo, sheepEyeMat);
+        rightEye.position.set(0.35, 0.2, 0.4);
+        headGroup.add(rightEye);
+
+        const leftEar = new THREE.Mesh(sheepEarGeo, sheepFaceMat);
+        leftEar.position.set(-0.4, 0.2, -0.3);
+        leftEar.rotation.z = Math.PI / 4;
+        leftEar.castShadow = true;
+        headGroup.add(leftEar);
+
+        const rightEar = new THREE.Mesh(sheepEarGeo, sheepFaceMat);
+        rightEar.position.set(0.4, 0.2, -0.3);
+        rightEar.rotation.z = -Math.PI / 4;
+        rightEar.castShadow = true;
+        headGroup.add(rightEar);
+
+        // Legs are direct children of the sheep group so they don't inherit
+        // the body's bounce animation. Diagonal pairs swing in opposite phase
+        // for a trotting gait (FL+BR, FR+BL).
+        const legs = [];
+        const legPositions = [
+            [-0.5, 0.6,  0.9], // front-left
+            [ 0.5, 0.6,  0.9], // front-right
+            [-0.5, 0.6, -0.9], // back-left
+            [ 0.5, 0.6, -0.9]  // back-right
+        ];
+        for (const [lx, ly, lz] of legPositions) {
+            const leg = new THREE.Mesh(sheepLegGeo, sheepFaceMat);
+            leg.position.set(lx, ly, lz);
+            leg.castShadow = true;
+            sheep.add(leg);
+            legs.push({ mesh: leg, initialZ: lz });
+        }
+
+        sheep.scale.setScalar(SHEEP_SCALE);
+        sheep.userData.body = bodyGroup;
+        sheep.userData.head = headGroup;
+        sheep.userData.legs = legs;
+        sheep.userData.walkCycle = rand() * Math.PI * 2;
+        return sheep;
+    }
+
+    // Returns true if (x,z) is inside a convex polygon given by ordered points.
+    function pointInConvexPoly(x, z, points) {
+        let prev = 0;
+        for (let i = 0; i < points.length; i++) {
+            const a = points[i];
+            const b = points[(i + 1) % points.length];
+            const cross = (b.x - a.x) * (z - a.z) - (b.z - a.z) * (x - a.x);
+            if (cross !== 0) {
+                if (prev === 0) prev = cross;
+                else if ((cross > 0) !== (prev > 0)) return false;
+            }
+        }
+        return true;
+    }
+
+    function createPastureCluster(tileId) {
+        const cluster = new THREE.Group();
+
+        // Deterministic RNG per tile.
+        let seed = 31337;
+        if (typeof tileId === 'number') {
+            seed = (tileId * 2971215073) >>> 0;
+        } else if (typeof tileId === 'string') {
+            for (let i = 0; i < tileId.length; i++) {
+                seed = (Math.imul(seed, 19) + tileId.charCodeAt(i)) >>> 0;
+            }
+        }
+        const rand = mulberry32(seed || 1);
+
+        // Sheep wander freely inside the hex, with a small inset so they
+        // don't clip past the flat edges. Build the inset hex polygon once
+        // and reuse it for both initial placement and per-frame bounds.
+        const apothem = hexSize * Math.cos(Math.PI / 6);
+        const edgeInset = 1.1;
+        const maxEdgeDist = apothem - edgeInset;
+        const grazingPoly = [];
+        for (let i = 0; i < 6; i++) {
+            // Hex corners at angles -30deg + 60deg * i, at distance apothem / cos(30deg)
+            // For a pointy-top hex, vertices sit at radius hexSize from center.
+            const ang = (-Math.PI / 6) + (i * Math.PI / 3);
+            const r = hexSize - edgeInset;
+            grazingPoly.push({ x: Math.cos(ang) * r, z: Math.sin(ang) * r });
+        }
+
+        // Place 4-6 sheep at deterministic positions inside the hex.
+        const sheepCount = 4 + Math.floor(rand() * 3);
+        const sampleBound = hexSize - edgeInset;
+        for (let i = 0; i < sheepCount; i++) {
+            let placed = false;
+            let attempts = 0;
+            while (!placed && attempts < 40) {
+                attempts++;
+                const rx = (rand() * 2 - 1) * sampleBound;
+                const rz = (rand() * 2 - 1) * sampleBound;
+                if (!pointInConvexPoly(rx, rz, grazingPoly)) continue;
+                const sheep = buildSheep(rand);
+                sheep.position.set(rx, 0, rz);
+                sheep.rotation.y = rand() * Math.PI * 2;
+                cluster.add(sheep);
+
+                // Pick an initial wander target inside the hex.
+                let tx = 0, tz = 0;
+                for (let t = 0; t < 20; t++) {
+                    const cx = (rand() * 2 - 1) * sampleBound;
+                    const cz = (rand() * 2 - 1) * sampleBound;
+                    if (pointInConvexPoly(cx, cz, grazingPoly)) {
+                        tx = cx; tz = cz; break;
+                    }
+                }
+                // Merge so we keep {body, head, legs, walkCycle} set by buildSheep.
+                Object.assign(sheep.userData, {
+                    targetX: tx,
+                    targetZ: tz,
+                    speed: 0.5 + rand() * 0.3,
+                    state: rand() < 0.5 ? 'wandering' : 'grazing',
+                    timer: 1.5 + rand() * 3.5,
+                    grazingPoly,
+                    sampleBound,
+                    rand
+                });
+                animatedSheep.push(sheep);
+                placed = true;
+            }
+        }
+
+        return cluster;
+    }
 
     // Highlight materials
     const hlSettlementMat = new THREE.MeshStandardMaterial({ color: 0x00ff00, transparent: true, opacity: 0.5 });
@@ -576,13 +1752,81 @@
         houseBaseGeo,
         houseRoofGeo,
         cityBaseGeo,
-        cityTopGeo
+        cityTopGeo,
+        portQuayGeo,
+        portPierGeo,
+        portPostGeo,
+        portCrateGeo,
+        boatHullGeo,
+        boatDeckGeo,
+        boatCabinGeo,
+        boatMastGeo,
+        boatSailGeo,
+        boatJibGeo,
+        // Trees
+        trunkSlimGeo,
+        trunkStandardGeo,
+        trunkThickGeo,
+        trunkTallGeo,
+        trunkStumpyGeo,
+        foliageConeLargeGeo,
+        foliageConeMedGeo,
+        foliageConeSmallGeo,
+        foliageConeTinyGeo,
+        foliageCypressGeo,
+        foliageRoundLargeGeo,
+        foliageRoundMedGeo,
+        foliageRoundSmallGeo,
+        foliageBlobGeo,
+        // Mountains (peak and snow-cap geometries are generated per instance,
+        // so only boulders are reusable)
+        boulderGeo,
+        boulderSmallGeo,
+        // Pasture
+        sheepBodyGeo,
+        sheepHeadGeo,
+        sheepEyeGeo,
+        sheepEarGeo,
+        sheepLegGeo
     ]);
     const reusableMaterials = new Set([
         hexSideMat,
         hexCapMat,
         ...Object.values(hexTopMaterials),
         hexTransitionMat,
+        portWoodMat,
+        portDarkWoodMat,
+        portStoneMat,
+        portCrateMat,
+        boatHullMat,
+        boatTrimMat,
+        boatCabinMat,
+        boatFlagMat,
+        sailMat,
+        // Trees
+        trunkBarkDarkMat,
+        trunkBarkMidMat,
+        trunkBarkLightMat,
+        trunkBirchMat,
+        foliageDeepMat,
+        foliagePineMat,
+        foliageMidMat,
+        foliageLightMat,
+        foliageOliveMat,
+        foliageAutumnMat,
+        foliageYellowMat,
+        // Mountains
+        rockDarkMat,
+        rockMidMat,
+        rockLightMat,
+        rockWarmMat,
+        snowMat,
+        // Pasture
+        sheepWoolMat,
+        sheepWoolDarkMat,
+        sheepDarkMat,
+        sheepFaceMat,
+        sheepEyeMat,
         hlSettlementMat,
         hlRoadMat,
         hlCityMat,
@@ -684,6 +1928,8 @@
     }
 
     function clearBoardGroup() {
+        floatingBoats = [];
+        animatedSheep = [];
         for (let i = boardGroup.children.length - 1; i >= 0; i--) {
             const obj = boardGroup.children[i];
             boardGroup.remove(obj);
@@ -700,6 +1946,11 @@
 
     // ======== 3D RENDER FUNCTIONS ========
     function renderTile(x, z, resource, number, tileId) {
+        const hasNumber = number !== null && number !== undefined && resource !== 'desert';
+        if (hasNumber) {
+            GameState.tileNumbers[tileId] = number;
+        }
+
         const mesh = new THREE.Mesh(hexGeom, hexBodyMaterials);
         mesh.position.set(x, 0, z);
         mesh.castShadow = true; mesh.receiveShadow = true;
@@ -719,13 +1970,21 @@
         transition.userData = { type: 'tile', id: tileId };
         boardGroup.add(transition);
 
-        if (number !== null && number !== undefined && resource !== 'desert') {
-            const tokenMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: createTokenTexture(number), roughness: 0.5 });
-            const token = new THREE.Mesh(tokenGeom, tokenMat);
-            token.position.set(x, hexHeight / 2 + 0.2, z);
-            token.castShadow = true; token.receiveShadow = true;
-            token.userData = { type: 'tile', id: tileId };
-            boardGroup.add(token);
+        if (resource === 'wood') {
+            const forest = createForestCluster(tileId);
+            forest.position.set(x, hexHeight / 2 + 0.02, z);
+            forest.userData = { type: 'tile', id: tileId };
+            boardGroup.add(forest);
+        } else if (resource === 'ore') {
+            const mountains = createMountainCluster(tileId);
+            mountains.position.set(x, hexHeight / 2 + 0.02, z);
+            mountains.userData = { type: 'tile', id: tileId };
+            boardGroup.add(mountains);
+        } else if (resource === 'sheep') {
+            const pasture = createPastureCluster(tileId);
+            pasture.position.set(x, hexHeight / 2 + 0.02, z);
+            pasture.userData = { type: 'tile', id: tileId };
+            boardGroup.add(pasture);
         }
     }
 
@@ -736,33 +1995,141 @@
         const mx = (v1.x + v2.x) / 2;
         const mz = (v1.z + v2.z) / 2;
         const angle = Math.atan2(v2.z - v1.z, v2.x - v1.x);
-        const portMat = new THREE.MeshStandardMaterial({ color: '#5c4033', roughness: 0.5 });
-        const dockGeo = new THREE.BoxGeometry(1.5, 0.5, 3);
-        const dock = new THREE.Mesh(dockGeo, portMat);
-        dock.position.set(mx, hexHeight / 2 + 0.25, mz);
-        dock.rotation.y = -angle;
-        dock.castShadow = true;
-        boardGroup.add(dock);
+        let rotation = -angle;
+        let outwardX = -Math.sin(angle);
+        let outwardZ = Math.cos(angle);
+        if ((outwardX * mx + outwardZ * mz) < 0) {
+            outwardX *= -1;
+            outwardZ *= -1;
+            rotation += Math.PI;
+        }
 
-        // Port label
+        const portGroup = new THREE.Group();
+        portGroup.position.set(mx, 0, mz);
+        portGroup.rotation.y = rotation;
+
+        const landTopY = hexHeight / 2 + 0.18;
+        const landPortZ = -0.82;
+        const quay = new THREE.Mesh(portQuayGeo, portStoneMat);
+        quay.position.set(0, landTopY, landPortZ);
+        quay.castShadow = true;
+        quay.receiveShadow = true;
+        portGroup.add(quay);
+
+        const pier = new THREE.Mesh(portPierGeo, portWoodMat);
+        pier.position.set(0, landTopY + 0.12, 2.15);
+        pier.castShadow = true;
+        pier.receiveShadow = true;
+        portGroup.add(pier);
+
+        const postPositions = [
+            [-0.42, -0.35], [0.42, -0.35],
+            [-0.42, 1.75], [0.42, 1.75],
+            [-0.42, 3.85], [0.42, 3.85]
+        ];
+        for (const [px, pz] of postPositions) {
+            const post = new THREE.Mesh(portPostGeo, portDarkWoodMat);
+            post.position.set(px, landTopY + 0.42 - portPostHeight, pz);
+            post.castShadow = true;
+            post.receiveShadow = true;
+            portGroup.add(post);
+        }
+
+        const crateA = new THREE.Mesh(portCrateGeo, portCrateMat);
+        crateA.position.set(-1.45, landTopY + 0.24, landPortZ);
+        crateA.rotation.y = 0.25;
+        crateA.castShadow = true;
+        crateA.receiveShadow = true;
+        portGroup.add(crateA);
+
+        const crateB = new THREE.Mesh(portCrateGeo, portCrateMat);
+        crateB.scale.set(0.8, 0.8, 0.8);
+        crateB.position.set(1.45, landTopY + 0.2, landPortZ + 0.1);
+        crateB.rotation.y = -0.35;
+        crateB.castShadow = true;
+        crateB.receiveShadow = true;
+        portGroup.add(crateB);
+
+        const boatGroup = new THREE.Group();
+        boatGroup.position.set(0, -0.72, 6.75);
+
+        const hull = new THREE.Mesh(boatHullGeo, boatHullMat);
+        hull.castShadow = true;
+        hull.receiveShadow = true;
+        boatGroup.add(hull);
+
+        const deck = new THREE.Mesh(boatDeckGeo, boatTrimMat);
+        deck.position.set(-0.22, 0.33, 0);
+        deck.castShadow = true;
+        deck.receiveShadow = true;
+        boatGroup.add(deck);
+
+        const cabin = new THREE.Mesh(boatCabinGeo, boatCabinMat);
+        cabin.position.set(-0.9, 0.55, 0);
+        cabin.castShadow = true;
+        cabin.receiveShadow = true;
+        boatGroup.add(cabin);
+
+        const bowTrim = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.08, 0.5), boatTrimMat);
+        bowTrim.position.set(0.82, 0.26, 0);
+        bowTrim.rotation.y = Math.PI / 4;
+        bowTrim.castShadow = true;
+        boatGroup.add(bowTrim);
+
+        const mast = new THREE.Mesh(boatMastGeo, portDarkWoodMat);
+        mast.position.set(0.12, 1.2, 0);
+        mast.castShadow = true;
+        boatGroup.add(mast);
+
+        const sail = new THREE.Mesh(boatSailGeo, sailMat);
+        sail.position.set(0.14, 0.38, 0.12);
+        sail.castShadow = true;
+        boatGroup.add(sail);
+
+        const jib = new THREE.Mesh(boatJibGeo, sailMat);
+        jib.position.set(0.2, 0.5, -0.1);
+        jib.rotation.y = Math.PI;
+        jib.castShadow = true;
+        boatGroup.add(jib);
+
+        const flag = new THREE.Mesh(createFlagGeometry(), boatFlagMat);
+        flag.position.set(0.12, 2.18, 0.02);
+        flag.castShadow = true;
+        boatGroup.add(flag);
+        boatGroup.userData.flag = flag;
+        boatGroup.userData.flagBase = Array.from(flag.geometry.attributes.position.array);
+        boatGroup.userData.floatBaseY = boatGroup.position.y;
+        boatGroup.userData.floatPhase = (Math.abs(mx) * 0.21) + (Math.abs(mz) * 0.17);
+        boatGroup.userData.floatWorldX = mx + outwardX * boatGroup.position.z;
+        boatGroup.userData.floatWorldZ = mz + outwardZ * boatGroup.position.z;
+        floatingBoats.push(boatGroup);
+        portGroup.add(boatGroup);
+
         const labelCanvas = document.createElement('canvas');
         labelCanvas.width = 64; labelCanvas.height = 32;
         const ctx = labelCanvas.getContext('2d');
-        ctx.fillStyle = '#fdfbf7';
+        ctx.fillStyle = '#f3dfb0';
         ctx.fillRect(0, 0, 64, 32);
-        ctx.fillStyle = '#222';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#5c4033';
+        ctx.strokeRect(2, 2, 60, 28);
+        ctx.fillStyle = '#2b1b12';
         ctx.font = 'bold 14px sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         const label = portData.port_type === 'THREE_TO_ONE' ? '3:1' : '2:1 ' + portData.port_type.charAt(0);
         ctx.fillText(label, 32, 16);
         const tex = new THREE.CanvasTexture(labelCanvas);
-        const labelMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5 });
-        const labelGeo = new THREE.PlaneGeometry(2, 1);
+        tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        dynamicTextures.add(tex);
+        const labelMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, side: THREE.DoubleSide });
+        const labelGeo = new THREE.PlaneGeometry(1.8, 0.9);
         const labelMesh = new THREE.Mesh(labelGeo, labelMat);
-        labelMesh.position.set(mx, hexHeight / 2 + 1.2, mz);
-        labelMesh.rotation.x = -Math.PI / 4;
-        labelMesh.rotation.y = -angle;
-        boardGroup.add(labelMesh);
+        labelMesh.position.set(0, landTopY + 0.18, landPortZ - 0.14);
+        labelMesh.rotation.x = -Math.PI / 2;
+        labelMesh.receiveShadow = true;
+        portGroup.add(labelMesh);
+
+        boardGroup.add(portGroup);
     }
 
     function createRobber(x, z) {
@@ -877,6 +2244,8 @@
     // ======== SCENE REBUILD ========
     function rebuildScene() {
         clearBoardGroup();
+        hideHoverToken();
+        GameState.tileNumbers = {};
         const state = GameState.publicState;
         if (!state) return;
         const board = state.board;
@@ -933,6 +2302,92 @@
     // ======== RAYCASTER / BOARD CLICKS ========
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
+
+    // ======== HOVER NUMBER TOKEN ========
+    // A single reusable token mesh that follows the hovered tile. It lives on the
+    // scene (not boardGroup) so it survives scene rebuilds. Textures are cached.
+    const tokenTextureCache = {};
+    function getTokenTexture(number) {
+        if (!tokenTextureCache[number]) {
+            const tex = createTokenTexture(number);
+            // The token mesh is a cylinder rotated 90deg so its flat face stands
+            // vertically. That rotation reorients the disk's UVs sideways, so we
+            // rotate the texture back by -90deg here to keep the number upright.
+            tex.center.set(0.5, 0.5);
+            tex.rotation = Math.PI / 2;
+            tex.needsUpdate = true;
+            tokenTextureCache[number] = tex;
+        }
+        return tokenTextureCache[number];
+    }
+    const hoverTokenMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.5,
+        transparent: true,
+        opacity: 0.0,
+        side: THREE.DoubleSide
+    });
+    // Pivot group: positioned above the tile, spun around world Y.
+    // Inner mesh: the disk-shaped cylinder rotated so it stands vertically
+    // (face perpendicular to the pivot's local +Z axis).
+    const hoverTokenPivot = new THREE.Group();
+    const hoverTokenMesh = new THREE.Mesh(tokenGeom, hoverTokenMat);
+    hoverTokenMesh.rotation.x = Math.PI / 2;
+    hoverTokenMesh.castShadow = true;
+    hoverTokenMesh.receiveShadow = true;
+    hoverTokenPivot.add(hoverTokenMesh);
+    hoverTokenPivot.visible = false;
+    hoverTokenPivot.userData = { currentTileId: null, targetOpacity: 0 };
+    scene.add(hoverTokenPivot);
+
+    // Kept for external references (rebuildScene hides via hideHoverToken).
+    const hoverToken = hoverTokenPivot;
+
+    // Height above the hex top where the token floats.
+    const hoverTokenFloatY = hexHeight / 2 + 4.2;
+
+    function showHoverToken(tileId) {
+        const pos = GameState.tilePositions[tileId];
+        const number = GameState.tileNumbers[tileId];
+        if (!pos || number === undefined) {
+            hideHoverToken();
+            return;
+        }
+        if (hoverTokenPivot.userData.currentTileId !== tileId) {
+            hoverTokenMat.map = getTokenTexture(number);
+            hoverTokenMat.needsUpdate = true;
+            hoverTokenPivot.position.set(pos.x, hoverTokenFloatY, pos.z);
+            hoverTokenPivot.userData.currentTileId = tileId;
+        }
+        hoverTokenPivot.visible = true;
+        hoverTokenPivot.userData.targetOpacity = 1.0;
+    }
+
+    function hideHoverToken() {
+        hoverTokenPivot.userData.targetOpacity = 0.0;
+        hoverTokenPivot.userData.currentTileId = null;
+    }
+
+    const hoverMouse = new THREE.Vector2();
+    renderer.domElement.addEventListener('mousemove', (event) => {
+        hoverMouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        hoverMouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(hoverMouse, camera);
+        const intersects = raycaster.intersectObjects(boardGroup.children, true);
+        for (const hit of intersects) {
+            let obj = hit.object;
+            while (obj && !obj.userData.type) obj = obj.parent;
+            if (!obj || !obj.userData.type) continue;
+            if (obj.userData.type === 'tile') {
+                showHoverToken(obj.userData.id);
+                return;
+            }
+            // First meaningful hit is not a tile, stop walking intersections.
+            break;
+        }
+        hideHoverToken();
+    });
+    renderer.domElement.addEventListener('mouseleave', hideHoverToken);
 
     renderer.domElement.addEventListener('click', (event) => {
         if (GameState.interactionMode === 'none') return;
@@ -1431,20 +2886,171 @@
     }
 
     // ======== ANIMATION LOOP ========
+    function getOceanWaveHeightAt(x, z, time) {
+        const wave1 = Math.sin(x * 0.05 + time) * 0.34;
+        const wave2 = Math.sin(z * 0.06 + time * 0.8) * 0.34;
+        const wave3 = Math.sin((x + z) * 0.1 - time * 1.5) * 0.14;
+        return oceanPlane.position.y + wave1 + wave2 + wave3;
+    }
+
     function animate() {
         requestAnimationFrame(animate);
         const time = Date.now() * 0.0012;
+        const nowMs = Date.now();
+        const dt = Math.min(0.1, (nowMs - (animate._last || nowMs)) / 1000);
+        animate._last = nowMs;
         const positions = oceanPlane.geometry.attributes.position;
         for (let i = 0; i < positions.count; i++) {
             const bp = basePositions[i];
-            const wave1 = Math.sin(bp.x * 0.05 + time) * 0.5;
-            const wave2 = Math.sin(bp.z * 0.06 + time * 0.8) * 0.5;
-            const wave3 = Math.sin((bp.x + bp.z) * 0.1 - time * 1.5) * 0.2;
+            const wave1 = Math.sin(bp.x * 0.05 + time) * 0.34;
+            const wave2 = Math.sin(bp.z * 0.06 + time * 0.8) * 0.34;
+            const wave3 = Math.sin((bp.x + bp.z) * 0.1 - time * 1.5) * 0.14;
             positions.setY(i, bp.y + wave1 + wave2 + wave3);
         }
         positions.needsUpdate = true;
         oceanPlane.geometry.computeVertexNormals();
+        for (const boat of floatingBoats) {
+            const phase = boat.userData.floatPhase || 0;
+            const waveY = getOceanWaveHeightAt(
+                boat.userData.floatWorldX || 0,
+                boat.userData.floatWorldZ || 0,
+                time
+            );
+            boat.position.y = waveY + 0.3 + Math.sin(time * 2.2 + phase) * 0.08;
+            boat.rotation.x = Math.sin(time * 1.6 + phase) * 0.045;
+            boat.rotation.z = Math.cos(time * 1.9 + phase) * 0.035;
+            const flag = boat.userData.flag;
+            const flagBase = boat.userData.flagBase;
+            if (flag && flagBase) {
+                const pos = flag.geometry.attributes.position;
+                for (let i = 0; i < pos.count; i++) {
+                    const baseX = flagBase[i * 3];
+                    const baseY = flagBase[i * 3 + 1];
+                    const baseZ = flagBase[i * 3 + 2];
+                    const freeEdge = baseX / 0.42;
+                    const flutter = Math.sin(time * 9 + phase + baseY * 18) * 0.055 * freeEdge;
+                    pos.setXYZ(i, baseX, baseY + flutter * 0.35, baseZ + flutter);
+                }
+                pos.needsUpdate = true;
+                flag.geometry.computeVertexNormals();
+            }
+        }
+
+        // Sheep wander: state machine (wandering <-> grazing) with a walking
+        // gait (alternating leg swing + body bounce) and head-down grazing.
+        for (const sheep of animatedSheep) {
+            const d = sheep.userData;
+            if (!d) continue;
+
+            // Timer-driven state transitions.
+            d.timer -= dt;
+            if (d.timer <= 0) {
+                if (d.state === 'wandering') {
+                    d.state = 'grazing';
+                    d.timer = 1.5 + d.rand() * 3.5;
+                } else {
+                    d.state = 'wandering';
+                    d.timer = 2.5 + d.rand() * 4.5;
+                    // Pick a new random target inside the hex pen.
+                    let tx = sheep.position.x, tz = sheep.position.z;
+                    const bound = d.sampleBound || hexSize * 0.8;
+                    for (let t = 0; t < 20; t++) {
+                        const cx = (d.rand() * 2 - 1) * bound;
+                        const cz = (d.rand() * 2 - 1) * bound;
+                        if (pointInConvexPoly(cx, cz, d.grazingPoly)) {
+                            tx = cx; tz = cz; break;
+                        }
+                    }
+                    d.targetX = tx;
+                    d.targetZ = tz;
+                }
+            }
+
+            if (d.state === 'wandering') {
+                const dx = d.targetX - sheep.position.x;
+                const dz = d.targetZ - sheep.position.z;
+                const distance = Math.sqrt(dx * dx + dz * dz);
+
+                if (distance > 0.12) {
+                    const nx = dx / distance;
+                    const nz = dz / distance;
+                    const step = d.speed * dt;
+                    const nextX = sheep.position.x + nx * step;
+                    const nextZ = sheep.position.z + nz * step;
+                    if (pointInConvexPoly(nextX, nextZ, d.grazingPoly)) {
+                        sheep.position.x = nextX;
+                        sheep.position.z = nextZ;
+                    } else {
+                        // Blocked at the hex edge: switch to grazing briefly.
+                        d.state = 'grazing';
+                        d.timer = 0.5 + d.rand() * 1.5;
+                    }
+
+                    // Smoothly face the movement direction.
+                    // Gemini convention: +Z is forward, so rotation = atan2(x, z).
+                    const targetRotation = Math.atan2(nx, nz);
+                    let diff = targetRotation - sheep.rotation.y;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    while (diff >  Math.PI) diff -= Math.PI * 2;
+                    sheep.rotation.y += diff * Math.min(1, dt * 5);
+
+                    // Walking animation (leg swing + body bounce).
+                    d.walkCycle += dt * 8;
+                    if (d.legs) {
+                        const swing = 0.3;
+                        d.legs[0].mesh.position.z = d.legs[0].initialZ + Math.sin(d.walkCycle) * swing;
+                        d.legs[1].mesh.position.z = d.legs[1].initialZ + Math.sin(d.walkCycle + Math.PI) * swing;
+                        d.legs[2].mesh.position.z = d.legs[2].initialZ + Math.sin(d.walkCycle + Math.PI) * swing;
+                        d.legs[3].mesh.position.z = d.legs[3].initialZ + Math.sin(d.walkCycle) * swing;
+                    }
+                    if (d.body) {
+                        d.body.position.y = Math.abs(Math.sin(d.walkCycle * 2)) * 0.1;
+                    }
+                    // Head up while walking.
+                    if (d.head) {
+                        d.head.rotation.x = THREE.MathUtils.lerp(d.head.rotation.x, 0, dt * 5);
+                        d.head.position.y = THREE.MathUtils.lerp(d.head.position.y, 2.3, dt * 5);
+                    }
+                } else {
+                    // Arrived: switch to grazing.
+                    d.state = 'grazing';
+                    d.timer = 1.5 + d.rand() * 3.5;
+                }
+            } else {
+                // Grazing: head down, legs and body settle.
+                if (d.head) {
+                    d.head.rotation.x = THREE.MathUtils.lerp(d.head.rotation.x, Math.PI / 3.5, dt * 3);
+                    d.head.position.y = THREE.MathUtils.lerp(d.head.position.y, 1.0, dt * 3);
+                }
+                if (d.legs) {
+                    for (const leg of d.legs) {
+                        leg.mesh.position.z = THREE.MathUtils.lerp(leg.mesh.position.z, leg.initialZ, dt * 5);
+                    }
+                }
+                if (d.body) {
+                    d.body.position.y = THREE.MathUtils.lerp(d.body.position.y, 0, dt * 5);
+                }
+            }
+        }
+
+
         controls.update();
+        // Fade hover token toward its target opacity and spin it around Y
+        const target = hoverTokenPivot.userData.targetOpacity ?? 0;
+        const current = hoverTokenMat.opacity;
+        if (current !== target) {
+            const step = 0.12;
+            const next = current + Math.sign(target - current) * Math.min(step, Math.abs(target - current));
+            hoverTokenMat.opacity = next;
+            if (next <= 0.001) {
+                hoverTokenPivot.visible = false;
+            } else {
+                hoverTokenPivot.visible = true;
+            }
+        }
+        if (hoverTokenPivot.visible) {
+            hoverTokenPivot.rotation.y += 0.025;
+        }
         renderer.render(scene, camera);
     }
 
