@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/assets/OpenCatan.png" />
+    <title>Open Catan</title>
+    <!-- Tailwind JIT via CDN (kept per Decision 5 notes; follow-up may install locally). -->
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="w-screen h-screen relative">
+    <!-- 3D Canvas -->
+    <div id="canvas-container" class="absolute inset-0 w-full h-full"></div>
+
+    <!-- UI Overlay -->
+    <div class="absolute inset-0 pointer-events-none flex flex-col justify-between p-4">
+      <!-- Top: Players Bar -->
+      <div id="players-bar" class="flex justify-center items-start space-x-2 w-full mt-2 pointer-events-auto flex-wrap"></div>
+
+      <!-- Middle Area -->
+      <div class="flex-1 flex justify-between items-end pb-16 pointer-events-none">
+        <!-- Left Side Buttons -->
+        <div class="flex flex-col space-y-2 pointer-events-auto">
+          <button id="sb-chat"     class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl">&#x1F4AC;</button>
+          <button id="sb-emotes"   class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl">&#x1F642;</button>
+          <button id="sb-trade"    class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl">&#x1F91D;</button>
+          <button id="sb-stats"    class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl">&#x1F4CA;</button>
+          <button id="sb-info"     class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl">&#x2139;&#xFE0F;</button>
+          <button id="sb-rules"    class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl">&#x1F4D6;</button>
+          <button id="sb-settings" class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl">&#x2699;&#xFE0F;</button>
+          <button id="sb-fps" title="Toggle FPS (F)" class="btn-side w-12 h-10 rounded flex items-center justify-center text-xs font-bold text-[#3e2723]">FPS</button>
+        </div>
+
+        <!-- Right Side: Action Buttons -->
+        <div class="flex flex-col items-end space-y-2 pointer-events-auto">
+          <div id="game-status" class="bg-black/80 text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-yellow-700 mb-1"></div>
+          <div id="action-buttons" class="flex flex-col space-y-2 items-end"></div>
+        </div>
+      </div>
+
+      <!-- Bottom: Resource Bar -->
+      <div class="flex justify-center w-full pb-2 pointer-events-auto">
+        <div id="resource-bar" class="bg-black/90 border-2 border-red-800 shadow-[0_0_15px_rgba(200,49,52,0.6)] rounded-full px-6 py-2 flex items-center space-x-6"></div>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-20 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- FPS overlay (toggle with F or sidebar button) -->
+    <div id="fps-counter" class="fixed top-4 left-4 z-40 px-2 py-1 rounded bg-black/70 border border-yellow-700 text-yellow-300 font-mono text-xs tabular-nums pointer-events-none">-- FPS</div>
+
+    <!-- Create Game Dialog -->
+    <div id="create-game-dialog" class="fixed inset-0 bg-black/85 flex items-center justify-center z-50">
+      <div class="bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[420px] shadow-2xl">
+        <h2 class="font-game text-yellow-400 text-2xl text-center mb-4">New Game</h2>
+        <div id="player-inputs" class="space-y-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-white font-bold w-6">1.</span>
+            <input type="text" class="flex-1 px-3 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800 focus:border-yellow-400 outline-none" placeholder="Player name" value="Alice" />
+            <select class="px-2 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800">
+              <option value="red">Red</option>
+              <option value="blue">Blue</option>
+              <option value="white">White</option>
+              <option value="orange">Orange</option>
+            </select>
+          </div>
+          <div class="flex items-center space-x-2">
+            <span class="text-white font-bold w-6">2.</span>
+            <input type="text" class="flex-1 px-3 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800 focus:border-yellow-400 outline-none" placeholder="Player name" value="Bob" />
+            <select class="px-2 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800">
+              <option value="blue" selected>Blue</option>
+              <option value="red">Red</option>
+              <option value="white">White</option>
+              <option value="orange">Orange</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex justify-between mt-4">
+          <button id="add-player-btn"  class="btn-action px-3 py-1.5 rounded text-sm font-bold text-[#3e2723]">+ Add Player</button>
+          <button id="start-game-btn"  class="btn-action px-6 py-2 rounded font-bold text-[#3e2723] text-lg">Start Game</button>
+        </div>
+        <div class="mt-4 text-center">
+          <p class="text-yellow-600 text-xs">or join existing:</p>
+          <div class="flex space-x-1 mt-1">
+            <input type="text" id="join-game-id" class="flex-1 px-2 py-1 rounded bg-[#5d4037] text-white border border-yellow-800 text-xs" placeholder="game_id" />
+            <input type="text" id="join-token"    class="flex-1 px-2 py-1 rounded bg-[#5d4037] text-white border border-yellow-800 text-xs" placeholder="player_token" />
+            <button id="join-game-btn" class="btn-action px-2 py-1 rounded text-xs font-bold text-[#3e2723]">Join</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Discard Dialog -->
+    <div id="discard-dialog" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden">
+      <div class="bg-[#3e2723] border-2 border-red-700 rounded-xl p-6 w-[400px] shadow-2xl">
+        <h2 class="font-game text-red-400 text-xl text-center mb-2">Discard Resources</h2>
+        <p id="discard-info" class="text-white text-sm text-center mb-3"></p>
+        <div id="discard-inputs" class="space-y-2"></div>
+        <button id="discard-submit" class="btn-action w-full mt-4 py-2 rounded font-bold text-[#3e2723]">Confirm Discard</button>
+      </div>
+    </div>
+
+    <!-- Robber Victim Dialog -->
+    <div id="victim-dialog" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden">
+      <div class="bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[350px] shadow-2xl">
+        <h2 class="font-game text-yellow-400 text-xl text-center mb-3">Steal From</h2>
+        <div id="victim-buttons" class="space-y-2"></div>
+        <button id="victim-skip" class="text-yellow-600 text-sm mt-3 block mx-auto">Skip (no steal)</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

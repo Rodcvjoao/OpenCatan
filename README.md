@@ -14,7 +14,16 @@ uv run uvicorn catan.api.main:app --reload --port 8000
 
 ```bash
 cd front
-python -m http.server 5173
+npm install
+npm run dev
 ```
 
-Open `http://localhost:5173/board.html`.
+Open `http://localhost:5173/`.
+
+Production build:
+
+```bash
+cd front
+npm run build
+npm run preview
+```
