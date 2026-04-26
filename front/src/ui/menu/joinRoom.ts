@@ -21,6 +21,7 @@ import type { RoomWsConnection } from "../../net/lobbyWs";
 import type { PlayerColor } from "../../types";
 import { $ } from "../dom";
 import { showToast } from "../toast";
+import { resumeAsHost } from "./createRoom";
 import {
   ALL_COLORS,
   colorOptionsHtml,
@@ -40,6 +41,10 @@ interface GuestState {
   // Debounce timer handle for the "peek room to filter colors" call.
   peekTimer: number | null;
   peekedCode: string;
+  // True once we've handed off to the host flow — guards against a late
+  // room_updated from the closing guest WS re-entering promoteToHost and
+  // clobbering persisted state with empty values.
+  handedOff: boolean;
 }
 
 const state: GuestState = {
@@ -51,6 +56,7 @@ const state: GuestState = {
   ws: null,
   peekTimer: null,
   peekedCode: "",
+  handedOff: false,
 };
 
 function escapeHtml(value: string): string {
@@ -219,6 +225,7 @@ async function joinRoomClick(): Promise<void> {
     state.color = color;
     state.playerToken = player_token;
     state.room = room;
+    state.handedOff = false;
     saveActiveRoom({ room_id: room.room_id, player_token, is_host: false });
     attachWs();
     renderLobby();
@@ -240,7 +247,27 @@ function attachWs(): void {
     roomId: state.roomId,
     playerToken: state.playerToken,
     onRoomUpdate: (room) => {
+      // Drop stale frames that arrived after we already handed off to the
+      // host flow (the guest WS may dispatch one more onmessage between
+      // close() and teardown).
+      if (state.handedOff) return;
       state.room = room;
+      // Backend auto-promotes the oldest guest when the host leaves.
+      // Detect that here and hand off to the host lobby flow so the
+      // promoted player actually gets the Start Game controls. Colors are
+      // unique per room (backend enforced), so color alone identifies us;
+      // fall back to name+color if a pending color-change race has us
+      // temporarily out of sync with the authoritative room state.
+      const me =
+        room.players.find((p) => p.color === state.color) ??
+        room.players.find((p) => p.name === state.name);
+      if (me?.is_host) {
+        promoteToHost(room, {
+          name: me.name,
+          color: me.color as PlayerColor,
+        });
+        return;
+      }
       renderLobby();
     },
     onGameStartFailed: (err) => {
@@ -250,6 +277,58 @@ function attachWs(): void {
       );
     },
   });
+}
+
+/** Switch this client from guest lobby to host lobby after the backend
+ *  handed the host role over to us. Reuses the Create Room flow's host
+ *  resume path so the two lobbies stay in sync. */
+function promoteToHost(
+  room: RoomState,
+  identity: { name: string; color: PlayerColor },
+): void {
+  // Guard against double-promotion from a late WS event.
+  if (state.handedOff) return;
+  state.handedOff = true;
+
+  // Snapshot what resumeAsHost needs before we tear down guest state.
+  const payload = {
+    roomId: state.roomId,
+    playerToken: state.playerToken,
+    room,
+    me: identity,
+  };
+
+  // Close the guest WS; resumeAsHost opens its own for the host flow.
+  state.ws?.close();
+  state.ws = null;
+
+  // Cancel any pending peek so a deferred fetch doesn't touch UI after
+  // we've left the join screen.
+  if (state.peekTimer !== null) {
+    window.clearTimeout(state.peekTimer);
+    state.peekTimer = null;
+  }
+  state.peekedCode = "";
+
+  // Persist the new role so a reload restores us as host, not guest.
+  saveActiveRoom({
+    room_id: payload.roomId,
+    player_token: payload.playerToken,
+    is_host: true,
+  });
+
+  // Clear guest-local state so a later re-entry starts from scratch.
+  // Name/color are intentionally cleared too: if another stale frame
+  // somehow slipped past the handedOff guard it would then fail the
+  // identity match and be ignored rather than re-promoting.
+  state.roomId = "";
+  state.playerToken = "";
+  state.room = null;
+  state.name = "";
+  state.color = "blue";
+
+  showToast("You are now the host", "info");
+  resumeAsHost(payload);
 }
 
 async function toggleReady(): Promise<void> {
@@ -271,10 +350,16 @@ async function toggleReady(): Promise<void> {
 async function leaveLobby(): Promise<void> {
   state.ws?.close();
   state.ws = null;
+  if (state.peekTimer !== null) {
+    window.clearTimeout(state.peekTimer);
+    state.peekTimer = null;
+  }
+  state.peekedCode = "";
   await leaveRoomAndClear(state.roomId, state.playerToken);
   state.roomId = "";
   state.playerToken = "";
   state.room = null;
+  state.handedOff = false;
   showScreen("mp-menu");
 }
 
@@ -314,6 +399,7 @@ export function resumeAsGuest(payload: {
   state.room = payload.room;
   state.name = payload.me.name;
   state.color = payload.me.color;
+  state.handedOff = false;
   attachWs();
   renderLobby();
   showScreen("mp-lobby-guest");
