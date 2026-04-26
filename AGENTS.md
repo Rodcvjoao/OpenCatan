@@ -89,6 +89,8 @@ If these are changed, visually verify road/vertex alignment.
 - Use `uv` and `pyproject.toml` only.
 - Run tests before finishing:
   - `cd back && uv run pytest catan/tests`
+- Backend binds to all interfaces via `--host 0.0.0.0` so other PCs on the
+  LAN can connect. It prints its reachable LAN URL on startup.
 
 ### Frontend
 
@@ -98,6 +100,15 @@ If these are changed, visually verify road/vertex alignment.
 - Typecheck: `cd front && npm run typecheck`
 - Production build: `cd front && npm run build` (outputs to `front/dist/`)
 - Static assets go in `front/public/` and are served at `/assets/...`.
+- `vite.config.ts` sets `host: true` so both `npm run dev` and
+  `npm run preview` bind to `0.0.0.0` — other LAN devices can connect via
+  the host's IP.
+- API URL is derived from `window.location.hostname` at runtime
+  (`src/config.ts`); no rebuild is needed to switch between localhost and
+  LAN access.
+- Menu / lobby UI lives in `front/src/ui/menu/`. The Multiplayer Create /
+  Join flow is backed by the `/rooms` endpoints and `/ws/rooms/{id}` — see
+  `back/FRONTEND_CONTRACT.md` "Lobby (Rooms)" for the protocol.
 
 ## Quality Checklist for Agents
 

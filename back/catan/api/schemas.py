@@ -74,3 +74,66 @@ class CommandResponse(BaseModel):
 class WebSocketMessage(BaseModel):
     type: str
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+# ======== Lobby / room schemas ========
+
+
+class RoomPlayer(BaseModel):
+    name: str
+    color: str
+    ready: bool
+    is_host: bool
+
+
+class RoomState(BaseModel):
+    room_id: str
+    players: list[RoomPlayer]
+    game_id: str | None = None
+    created_at: float
+
+
+class CreateRoomRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=32)
+    color: str = Field(min_length=1, max_length=32)
+
+
+class JoinRoomRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=32)
+    color: str = Field(min_length=1, max_length=32)
+
+
+class ChangeColorRequest(BaseModel):
+    player_token: str = Field(min_length=1)
+    color: str = Field(min_length=1, max_length=32)
+
+
+class SetReadyRequest(BaseModel):
+    player_token: str = Field(min_length=1)
+    ready: bool
+
+
+class LeaveRoomRequest(BaseModel):
+    player_token: str = Field(min_length=1)
+
+
+class StartGameRequest(BaseModel):
+    player_token: str = Field(min_length=1)
+
+
+class RoomMembershipResponse(BaseModel):
+    """Returned to the owner of a newly-created or just-joined player slot."""
+
+    room: RoomState
+    player_token: str
+
+
+class RoomStateResponse(BaseModel):
+    room: RoomState
+
+
+class StartGameResponse(BaseModel):
+    game_id: str
+    # The game token for the player who called Start. Other players learn
+    # their own tokens via the `game_started` WebSocket broadcast.
+    game_token: str

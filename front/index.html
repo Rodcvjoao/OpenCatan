@@ -50,45 +50,174 @@
     <!-- FPS overlay (toggle with F or sidebar button) -->
     <div id="fps-counter" class="fixed top-4 left-4 z-40 px-2 py-1 rounded bg-black/70 border border-yellow-700 text-yellow-300 font-mono text-xs tabular-nums pointer-events-none">-- FPS</div>
 
-    <!-- Create Game Dialog -->
-    <div id="create-game-dialog" class="fixed inset-0 bg-black/85 flex items-center justify-center z-50">
-      <div class="bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[420px] shadow-2xl">
-        <h2 class="font-game text-yellow-400 text-2xl text-center mb-4">New Game</h2>
-        <div id="player-inputs" class="space-y-3">
-          <div class="flex items-center space-x-2">
-            <span class="text-white font-bold w-6">1.</span>
-            <input type="text" class="flex-1 px-3 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800 focus:border-yellow-400 outline-none" placeholder="Player name" value="Alice" />
-            <select class="px-2 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800">
-              <option value="red">Red</option>
-              <option value="blue">Blue</option>
-              <option value="white">White</option>
-              <option value="orange">Orange</option>
-            </select>
-          </div>
-          <div class="flex items-center space-x-2">
-            <span class="text-white font-bold w-6">2.</span>
-            <input type="text" class="flex-1 px-3 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800 focus:border-yellow-400 outline-none" placeholder="Player name" value="Bob" />
-            <select class="px-2 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800">
-              <option value="blue" selected>Blue</option>
-              <option value="red">Red</option>
-              <option value="white">White</option>
-              <option value="orange">Orange</option>
-            </select>
-          </div>
-        </div>
-        <div class="flex justify-between mt-4">
-          <button id="add-player-btn"  class="btn-action px-3 py-1.5 rounded text-sm font-bold text-[#3e2723]">+ Add Player</button>
-          <button id="start-game-btn"  class="btn-action px-6 py-2 rounded font-bold text-[#3e2723] text-lg">Start Game</button>
-        </div>
-        <div class="mt-4 text-center">
-          <p class="text-yellow-600 text-xs">or join existing:</p>
-          <div class="flex space-x-1 mt-1">
-            <input type="text" id="join-game-id" class="flex-1 px-2 py-1 rounded bg-[#5d4037] text-white border border-yellow-800 text-xs" placeholder="game_id" />
-            <input type="text" id="join-token"    class="flex-1 px-2 py-1 rounded bg-[#5d4037] text-white border border-yellow-800 text-xs" placeholder="player_token" />
-            <button id="join-game-btn" class="btn-action px-2 py-1 rounded text-xs font-bold text-[#3e2723]">Join</button>
-          </div>
+    <!-- ========= Menu System ========= -->
+    <div id="menu-root" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+
+      <!-- ===== Main Menu ===== -->
+      <div id="screen-main" class="bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-8 w-[420px] shadow-2xl text-center">
+        <img src="/assets/OpenCatan.png" alt="Open Catan" class="w-24 h-24 mx-auto mb-3 rounded-lg shadow-lg" />
+        <h1 class="font-game text-yellow-400 text-4xl mb-8">Open Catan</h1>
+        <div class="flex flex-col space-y-3">
+          <button id="btn-menu-singleplayer" class="btn-action py-3 rounded font-bold text-[#3e2723] text-lg">Singleplayer</button>
+          <button id="btn-menu-multiplayer" class="btn-action py-3 rounded font-bold text-[#3e2723] text-lg">Multiplayer</button>
+          <button id="btn-menu-settings" class="btn-action py-3 rounded font-bold text-[#3e2723] text-lg">Settings</button>
         </div>
       </div>
+
+      <!-- ===== Singleplayer Setup ===== -->
+      <div id="screen-sp-setup" class="hidden bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[460px] shadow-2xl">
+        <h2 class="font-game text-yellow-400 text-2xl text-center mb-4">Singleplayer</h2>
+
+        <div class="flex items-center space-x-2 mb-4">
+          <span class="text-white font-bold w-6">1.</span>
+          <input id="sp-human-name" type="text" value="Player" class="flex-1 px-3 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800 focus:border-yellow-400 outline-none" placeholder="Your name" />
+          <select id="sp-human-color" class="px-2 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800"></select>
+        </div>
+
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-yellow-400 font-bold text-sm">AI Opponents</span>
+          <div class="flex items-center space-x-2">
+            <button id="sp-bot-dec" class="btn-side w-8 h-8 rounded text-[#3e2723] font-bold">-</button>
+            <span id="sp-bot-count" class="text-white font-bold w-6 text-center">2</span>
+            <button id="sp-bot-inc" class="btn-side w-8 h-8 rounded text-[#3e2723] font-bold">+</button>
+          </div>
+        </div>
+        <div id="sp-bot-list" class="space-y-2 mb-4"></div>
+
+        <div class="flex justify-between mt-4">
+          <button id="btn-sp-back" class="btn-action px-5 py-2 rounded font-bold text-[#3e2723]">Back</button>
+          <button id="btn-sp-start" class="btn-action px-6 py-2 rounded font-bold text-[#3e2723] text-lg" disabled>Start Game</button>
+        </div>
+        <p class="text-yellow-600 text-xs text-center mt-3">AI opponents coming soon</p>
+      </div>
+
+      <!-- ===== Multiplayer Menu ===== -->
+      <div id="screen-mp-menu" class="hidden bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-8 w-[380px] shadow-2xl text-center">
+        <h2 class="font-game text-yellow-400 text-3xl mb-6">Multiplayer</h2>
+        <div class="flex flex-col space-y-3">
+          <button id="btn-mp-create" class="btn-action py-3 rounded font-bold text-[#3e2723] text-lg">Create Room</button>
+          <button id="btn-mp-join" class="btn-action py-3 rounded font-bold text-[#3e2723] text-lg">Join Room</button>
+          <button id="btn-mp-back" class="btn-action py-2.5 rounded font-bold text-[#3e2723]">Back</button>
+        </div>
+      </div>
+
+      <!-- ===== Create Room Setup ===== -->
+      <div id="screen-mp-create" class="hidden bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[400px] shadow-2xl">
+        <h2 class="font-game text-yellow-400 text-2xl text-center mb-5">Create Room</h2>
+        <label class="block text-yellow-400 text-xs font-bold mb-1">Your Name</label>
+        <input id="mp-create-name" type="text" value="Host" class="w-full px-3 py-2 rounded bg-[#5d4037] text-white border border-yellow-800 focus:border-yellow-400 outline-none mb-3" placeholder="Your name" />
+        <label class="block text-yellow-400 text-xs font-bold mb-1">Your Color</label>
+        <select id="mp-create-color" class="w-full px-3 py-2 rounded bg-[#5d4037] text-white border border-yellow-800 mb-5">
+          <option value="red">Red</option>
+          <option value="blue">Blue</option>
+          <option value="white">White</option>
+          <option value="orange">Orange</option>
+        </select>
+        <div class="flex justify-between">
+          <button id="btn-mp-create-back" class="btn-action px-5 py-2 rounded font-bold text-[#3e2723]">Back</button>
+          <button id="btn-mp-create-go" class="btn-action px-6 py-2 rounded font-bold text-[#3e2723] text-lg">Create Room</button>
+        </div>
+      </div>
+
+      <!-- ===== Lobby (Host) ===== -->
+      <div id="screen-mp-lobby-host" class="hidden bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[460px] shadow-2xl">
+        <h2 class="font-game text-yellow-400 text-2xl text-center mb-3">Room Lobby</h2>
+        <div class="bg-black/60 rounded-lg p-3 flex items-center justify-between mb-4 border border-yellow-800">
+          <span class="text-yellow-400 text-xs font-bold">Room Code</span>
+          <span id="mp-lobby-host-code" class="font-mono text-white font-bold text-2xl tabular-nums tracking-widest">------</span>
+          <button id="btn-lobby-host-copy" class="btn-side px-3 py-1 rounded text-xs font-bold" title="Copy to clipboard">Copy</button>
+        </div>
+        <div id="mp-lobby-host-controls" class="mb-3"></div>
+        <div id="mp-lobby-host-slots" class="space-y-2 mb-4"></div>
+        <div class="flex justify-between">
+          <button id="btn-lobby-host-leave" class="btn-action px-4 py-2 rounded font-bold text-[#3e2723]">Leave Room</button>
+          <button id="btn-lobby-host-start" class="btn-action px-6 py-2 rounded font-bold text-[#3e2723] text-lg" disabled>Start Game</button>
+        </div>
+        <p class="text-yellow-700 text-xs text-center mt-3 italic">Share the room code with friends to let them join</p>
+      </div>
+
+      <!-- ===== Join Room Setup ===== -->
+      <div id="screen-mp-join" class="hidden bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[400px] shadow-2xl">
+        <h2 class="font-game text-yellow-400 text-2xl text-center mb-5">Join Room</h2>
+        <label class="block text-yellow-400 text-xs font-bold mb-1">Room Code</label>
+        <input id="mp-join-code" type="text" class="w-full px-3 py-2 rounded bg-[#5d4037] text-white border border-yellow-800 focus:border-yellow-400 outline-none mb-3 font-mono uppercase tracking-widest" placeholder="e.g. ABCDEF" />
+        <label class="block text-yellow-400 text-xs font-bold mb-1">Your Name</label>
+        <input id="mp-join-name" type="text" value="Player" class="w-full px-3 py-2 rounded bg-[#5d4037] text-white border border-yellow-800 focus:border-yellow-400 outline-none mb-3" placeholder="Your name" />
+        <label class="block text-yellow-400 text-xs font-bold mb-1">Your Color</label>
+        <select id="mp-join-color" class="w-full px-3 py-2 rounded bg-[#5d4037] text-white border border-yellow-800 mb-5">
+          <option value="blue">Blue</option>
+          <option value="red">Red</option>
+          <option value="white">White</option>
+          <option value="orange">Orange</option>
+        </select>
+        <div class="flex justify-between">
+          <button id="btn-mp-join-back" class="btn-action px-5 py-2 rounded font-bold text-[#3e2723]">Back</button>
+          <button id="btn-mp-join-go" class="btn-action px-6 py-2 rounded font-bold text-[#3e2723] text-lg">Join Room</button>
+        </div>
+      </div>
+
+      <!-- ===== Lobby (Guest) ===== -->
+      <div id="screen-mp-lobby-guest" class="hidden bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[460px] shadow-2xl">
+        <h2 class="font-game text-yellow-400 text-2xl text-center mb-3">Room Lobby</h2>
+        <div class="bg-black/60 rounded-lg p-3 flex items-center justify-between mb-4 border border-yellow-800">
+          <span class="text-yellow-400 text-xs font-bold">Room Code</span>
+          <span id="mp-lobby-guest-code" class="font-mono text-white font-bold text-2xl tabular-nums tracking-widest">------</span>
+        </div>
+        <div id="mp-lobby-guest-controls" class="mb-3"></div>
+        <div id="mp-lobby-guest-slots" class="space-y-2 mb-4"></div>
+        <p class="text-yellow-600 text-xs text-center mb-4">Waiting for host to start the game...</p>
+        <div class="flex justify-between">
+          <button id="btn-lobby-guest-leave" class="btn-action px-4 py-2 rounded font-bold text-[#3e2723]">Leave Room</button>
+          <button id="btn-lobby-guest-ready" class="btn-action px-6 py-2 rounded font-bold text-[#3e2723] text-lg">Ready</button>
+        </div>
+      </div>
+
+      <!-- ===== Settings ===== -->
+      <div id="screen-settings" class="hidden bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[460px] shadow-2xl">
+        <h2 class="font-game text-yellow-400 text-2xl text-center mb-5">Settings</h2>
+
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <label for="st-preset" class="text-yellow-400 font-bold text-sm">Graphics Preset</label>
+            <select id="st-preset" class="px-2 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <label for="st-shadow" class="text-yellow-400 font-bold text-sm">Shadow Quality</label>
+            <select id="st-shadow" class="px-2 py-1.5 rounded bg-[#5d4037] text-white border border-yellow-800">
+              <option value="high">High (2048)</option>
+              <option value="medium">Medium (1024)</option>
+              <option value="low">Low (512)</option>
+              <option value="off">Off</option>
+            </select>
+          </div>
+
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-yellow-400 font-bold text-sm">Ocean animation</span>
+            <input id="st-ocean" type="checkbox" class="w-5 h-5 accent-yellow-600" />
+          </label>
+
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-yellow-400 font-bold text-sm">Flora &amp; fauna animation</span>
+            <input id="st-flora" type="checkbox" class="w-5 h-5 accent-yellow-600" />
+          </label>
+
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-yellow-400 font-bold text-sm">Show FPS counter <span class="text-yellow-700 text-xs">(F)</span></span>
+            <input id="st-fps" type="checkbox" class="w-5 h-5 accent-yellow-600" />
+          </label>
+        </div>
+
+        <div class="flex justify-between mt-6">
+          <button id="btn-st-reset" class="btn-action px-4 py-2 rounded font-bold text-[#3e2723] text-sm">Reset Defaults</button>
+          <button id="btn-st-back" class="btn-action px-6 py-2 rounded font-bold text-[#3e2723] text-lg">Back</button>
+        </div>
+      </div>
+
     </div>
 
     <!-- Discard Dialog -->

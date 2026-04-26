@@ -287,6 +287,90 @@ Important:
 - `game_state_updated` contains public state only.
 - Frontend should re-fetch `GET /state?player_token=...` after update to refresh private hand/legal actions.
 
+## Lobby (Rooms)
+
+A pre-game lobby where players gather, pick unique colors, mark ready, and
+the host presses Start to create the real game. Rooms are identified by a
+short 6-character alphanumeric code (uppercase). Room codes are
+case-insensitive.
+
+### Endpoints
+
+- `POST /rooms` — create a room.
+  - Body: `{ "name": "Alice", "color": "red" }`
+  - Returns: `{ "room": RoomState, "player_token": "..." }` — persist the
+    `player_token` client-side; it authenticates the player _within the
+    lobby_ only.
+- `GET /rooms/{room_id}` — fetch current room state (public, no tokens).
+  - Returns: `{ "room": RoomState }`
+  - `404` if unknown.
+- `POST /rooms/{room_id}/join` — join as a guest.
+  - Body: `{ "name": "Bob", "color": "blue" }`
+  - Returns: `{ "room": RoomState, "player_token": "..." }`
+  - `400` on duplicate color / full / already-started; `404` on unknown room.
+- `POST /rooms/{room_id}/color` — change your color.
+  - Body: `{ "player_token": "...", "color": "white" }`
+  - `400` on duplicate.
+- `POST /rooms/{room_id}/ready` — toggle ready state for a guest. Host is
+  always ready; the server silently enforces this.
+  - Body: `{ "player_token": "...", "ready": true }`
+- `POST /rooms/{room_id}/leave` — leave the room. If the host leaves, the
+  oldest remaining player is auto-promoted.
+  - Body: `{ "player_token": "..." }`
+- `POST /rooms/{room_id}/start` — host creates the real game.
+  - Body: `{ "player_token": "..." }`
+  - `400` unless there are 2-4 players and every player is ready.
+  - Returns: `{ "game_id": "...", "game_token": "..." }` (the caller's
+    game token). Other players receive their game tokens via the
+    `game_started` WebSocket broadcast.
+
+### RoomState shape
+
+```json
+{
+  "room_id": "ABCDEF",
+  "players": [
+    { "name": "Alice", "color": "red",  "ready": true,  "is_host": true },
+    { "name": "Bob",   "color": "blue", "ready": false, "is_host": false }
+  ],
+  "game_id": null,
+  "created_at": 1700000000.0
+}
+```
+
+Player tokens are **never** included in room state payloads.
+
+### Room WebSocket
+
+- Connect: `WS /ws/rooms/{room_id}?player_token=...` — the lobby
+  `player_token` returned by `POST /rooms` or `POST /rooms/{id}/join` is
+  required. Unauthenticated sockets are closed with code `4401`, and
+  unknown rooms close with code `4404`.
+- Server -> client messages:
+  - `room_snapshot` — full room state on connect and in response to
+    client `snapshot` requests.
+  - `room_updated` — broadcast on any state mutation.
+  - `game_started` — sent when the host presses Start. Each connected
+    client receives a payload targeted to *their* token only — the full
+    lobby→game token map is never broadcast. Also re-sent to any socket
+    that connects *after* Start (refresh / reconnect / late tab)
+    immediately after its `room_snapshot`, so a reconnecting player can
+    still discover their `game_token`.
+    - Payload: `{ "game_id": "...", "game_token": "<this client's token>" }`
+    - Clients use `payload.game_token` directly and transition into the
+      game via the existing `/ws/games/{game_id}` flow.
+  - `error`, `pong`.
+- Client -> server:
+  - `{"type":"ping","payload":{}}`
+  - `{"type":"snapshot","payload":{}}`
+
+### Lifecycle
+
+- Rooms with no active WebSocket connections and no mutations for 5
+  minutes are garbage-collected lazily on the next API call.
+- Once `game_started` has fired the room becomes read-only (no more
+  joins / color changes / ready toggles).
+
 ## Recommended Frontend Sync Logic
 
 1. On every command send `expected_version` = current local version.

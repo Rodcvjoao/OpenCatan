@@ -55,6 +55,38 @@ const fillLight = new THREE.DirectionalLight(0xddeeff, 0.3);
 fillLight.position.set(-30, 20, -20);
 scene.add(fillLight);
 
+/** Live-applied shadow quality control (driven by the Settings screen).
+ *  "off" disables shadow rendering entirely; the other levels swap the
+ *  shadow map resolution. */
+export type ShadowQualityLevel = "high" | "medium" | "low" | "off";
+export function applyShadowQuality(level: ShadowQualityLevel): void {
+  if (level === "off") {
+    renderer.shadowMap.enabled = false;
+    scene.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.material) {
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const m of mats) m.needsUpdate = true;
+      }
+    });
+    return;
+  }
+  renderer.shadowMap.enabled = true;
+  const size = level === "high" ? 2048 : level === "medium" ? 1024 : 512;
+  dirLight.shadow.mapSize.set(size, size);
+  if (dirLight.shadow.map) {
+    dirLight.shadow.map.dispose();
+    dirLight.shadow.map = null;
+  }
+  scene.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+    if (mesh.material) {
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of mats) m.needsUpdate = true;
+    }
+  });
+}
+
 // Single ocean plane with fade-based animation: waves in the center around
 // the board, flat at the edges. Keeps the perf win of only animating a
 // small region while avoiding the two-plane seam and the shadow / fog /

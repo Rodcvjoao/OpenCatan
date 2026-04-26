@@ -3,8 +3,18 @@
 
 import type { AxialCoord, PlayerColor, Resource } from "./types";
 
-export const API_BASE = "http://localhost:8000";
-export const WS_BASE = "ws://localhost:8000";
+// The backend listens on port 8000 on the same host that serves the
+// frontend. Deriving the hostname from `window.location` at runtime means
+// the app works unchanged whether you open it as `http://localhost:5173/`,
+// `http://192.168.1.5:5173/`, or `https://catan.example.com/`.
+const isHttps =
+  typeof window !== "undefined" && window.location.protocol === "https:";
+const apiHost =
+  (typeof window !== "undefined" && window.location.hostname) || "localhost";
+const apiPort = 8000;
+
+export const API_BASE = `${isHttps ? "https" : "http"}://${apiHost}:${apiPort}`;
+export const WS_BASE = `${isHttps ? "wss" : "ws"}://${apiHost}:${apiPort}`;
 
 // Tile id -> axial coordinate. Hardcoded base-Catan topology; must match
 // back/catan/topology/standard_board.py per Decision 3 in AGENTS.md.
