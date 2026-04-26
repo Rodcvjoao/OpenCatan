@@ -70,6 +70,21 @@ class Room:
     def find_player(self, token: str) -> LobbyPlayer | None:
         return next((p for p in self.players if p.player_token == token), None)
 
+    def has_member(self, token: str) -> bool:
+        """True if `token` is an accepted lobby token for this room.
+
+        Before Start, that means the token belongs to a current player.
+        After Start the room is frozen and `players` may or may not
+        still hold the same entries, but `lobby_to_game_token` is the
+        authoritative record of who was part of the session — accept
+        those tokens too so reconnecting clients can still authenticate.
+        """
+        if not token:
+            return False
+        if self.find_player(token) is not None:
+            return True
+        return token in self.lobby_to_game_token
+
     def is_color_taken(
         self, color: str, *, exclude_token: str | None = None
     ) -> bool:

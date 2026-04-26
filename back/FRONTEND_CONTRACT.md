@@ -342,17 +342,22 @@ Player tokens are **never** included in room state payloads.
 
 ### Room WebSocket
 
-- Connect: `WS /ws/rooms/{room_id}` — unknown room closes with code `4404`.
+- Connect: `WS /ws/rooms/{room_id}?player_token=...` — the lobby
+  `player_token` returned by `POST /rooms` or `POST /rooms/{id}/join` is
+  required. Unauthenticated sockets are closed with code `4401`, and
+  unknown rooms close with code `4404`.
 - Server -> client messages:
   - `room_snapshot` — full room state on connect and in response to
     client `snapshot` requests.
   - `room_updated` — broadcast on any state mutation.
-  - `game_started` — broadcast when the host presses Start. Also
-    re-sent to any socket that connects *after* Start (refresh /
-    reconnect / late tab) immediately after its `room_snapshot`, so a
-    reconnecting player can still discover their `game_token`.
-    - Payload: `{ "game_id": "...", "tokens": { "<lobby_token>": "<game_token>" } }`
-    - Clients look up their own `game_token` and transition into the
+  - `game_started` — sent when the host presses Start. Each connected
+    client receives a payload targeted to *their* token only — the full
+    lobby→game token map is never broadcast. Also re-sent to any socket
+    that connects *after* Start (refresh / reconnect / late tab)
+    immediately after its `room_snapshot`, so a reconnecting player can
+    still discover their `game_token`.
+    - Payload: `{ "game_id": "...", "game_token": "<this client's token>" }`
+    - Clients use `payload.game_token` directly and transition into the
       game via the existing `/ws/games/{game_id}` flow.
   - `error`, `pong`.
 - Client -> server:

@@ -4,7 +4,7 @@ import json
 import socket
 from collections import defaultdict
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from catan.api.lobby import LobbyError, LobbyManager
@@ -394,29 +394,53 @@ async def start_room_game(
     if host_game_token is None:
         raise HTTPException(status_code=500, detail="Host token not mapped")
 
-    # Notify every connected client: room is done, here are your game tokens.
-    await room_hub.broadcast(
-        room.room_id,
-        {
-            "type": "game_started",
-            "payload": {
-                "game_id": room.game_id,
-                "tokens": dict(room.lobby_to_game_token),
+    # Notify every connected client: room is done, here is *your* game
+    # token. We explicitly do NOT broadcast a shared payload here — doing
+    # so would hand every other player's game token to anyone connected
+    # to the room WS. Instead, iterate authenticated sockets and send
+    # each one only the token it is entitled to.
+    for socket, lobby_token in room_hub.members(room.room_id):
+        game_token = room.lobby_to_game_token.get(lobby_token)
+        if game_token is None:
+            # Socket authenticated with a token that didn't end up in the
+            # started game (shouldn't happen in practice). Skip silently
+            # rather than leak anyone else's token.
+            continue
+        await room_hub.send_to(
+            socket,
+            {
+                "type": "game_started",
+                "payload": {
+                    "game_id": room.game_id,
+                    "game_token": game_token,
+                },
             },
-        },
-    )
+        )
     return StartGameResponse(game_id=room.game_id, game_token=host_game_token)
 
 
 @app.websocket("/ws/rooms/{room_id}")
-async def room_ws(room_id: str, websocket: WebSocket) -> None:
+async def room_ws(
+    room_id: str,
+    websocket: WebSocket,
+    player_token: str | None = Query(default=None),
+) -> None:
     room = lobby.get_room(room_id)
     if room is None:
         await websocket.accept()
         await websocket.close(code=4404)
         return
 
-    await room_hub.connect(room.room_id, websocket)
+    # Authenticate the socket against a known lobby token for this room.
+    # Without this gate, anyone who learns a room code could subscribe to
+    # room state updates and (post-Start) receive every player's game
+    # token.
+    if not player_token or not room.has_member(player_token):
+        await websocket.accept()
+        await websocket.close(code=4401)
+        return
+
+    await room_hub.connect(room.room_id, websocket, player_token)
     lobby.on_connect(room.room_id)
     try:
         await websocket.send_json(
@@ -426,17 +450,19 @@ async def room_ws(room_id: str, websocket: WebSocket) -> None:
         # (refresh / reconnect / late-opened tab), replay the game_started
         # payload so the client can look up its own game_token and move on
         # to /ws/games/{game_id}. Without this, reconnecting players stay
-        # stuck in the lobby forever.
+        # stuck in the lobby forever. Send only this socket's own token.
         if room.game_id is not None:
-            await websocket.send_json(
-                {
-                    "type": "game_started",
-                    "payload": {
-                        "game_id": room.game_id,
-                        "tokens": dict(room.lobby_to_game_token),
-                    },
-                }
-            )
+            game_token = room.lobby_to_game_token.get(player_token)
+            if game_token is not None:
+                await websocket.send_json(
+                    {
+                        "type": "game_started",
+                        "payload": {
+                            "game_id": room.game_id,
+                            "game_token": game_token,
+                        },
+                    }
+                )
         while True:
             raw = await websocket.receive_text()
             try:

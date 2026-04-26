@@ -23,13 +23,13 @@ export function startRoomWs(options: {
   onRoomUpdate: RoomWsUpdate;
   onGameStartFailed?: (err: unknown) => void;
 }): RoomWsConnection {
-  return connectRoomWs(options.roomId, (event) => {
+  return connectRoomWs(options.roomId, options.playerToken, (event) => {
     if (event.type === "room_snapshot" || event.type === "room_updated") {
       options.onRoomUpdate(event.payload);
       return;
     }
     if (event.type === "game_started") {
-      const gameToken = event.payload.tokens[options.playerToken];
+      const gameToken = event.payload.game_token;
       if (!gameToken) {
         options.onGameStartFailed?.(
           new Error("Did not receive game token from server"),

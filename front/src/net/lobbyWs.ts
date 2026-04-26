@@ -9,7 +9,9 @@ export type RoomWsEvent =
   | { type: "room_updated"; payload: RoomState }
   | {
       type: "game_started";
-      payload: { game_id: string; tokens: Record<string, string> };
+      // Backend now sends each client only its own game_token, not the
+      // full lobby->game_token map — see FRONTEND_CONTRACT.md "Lobby".
+      payload: { game_id: string; game_token: string };
     }
   | { type: "error"; payload: { message?: string } }
   | { type: "pong"; payload: unknown };
@@ -24,13 +26,20 @@ const RECONNECT_DELAY_MS = 3000;
 
 export function connectRoomWs(
   roomId: string,
+  playerToken: string,
   handler: RoomWsHandler,
 ): RoomWsConnection {
   let closedByUser = false;
   let ws: WebSocket | null = null;
 
   function open(): void {
-    ws = new WebSocket(`${WS_BASE}/ws/rooms/${encodeURIComponent(roomId)}`);
+    // Authenticate the room WS with the lobby player_token. The backend
+    // closes with code 4401 if the token is missing/invalid, and 4404 if
+    // the room doesn't exist.
+    const url =
+      `${WS_BASE}/ws/rooms/${encodeURIComponent(roomId)}` +
+      `?player_token=${encodeURIComponent(playerToken)}`;
+    ws = new WebSocket(url);
     ws.onmessage = (event) => {
       try {
         const parsed = JSON.parse(event.data) as RoomWsEvent;

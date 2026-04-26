@@ -159,7 +159,11 @@ def test_start_game_creates_game_and_broadcasts() -> None:
         json={"player_token": joined["player_token"], "ready": True},
     )
 
-    with client.websocket_connect(f"/ws/rooms/{room_id}") as ws:
+    # Guest is connected to the room WS when Start fires.
+    guest_token = joined["player_token"]
+    with client.websocket_connect(
+        f"/ws/rooms/{room_id}?player_token={guest_token}"
+    ) as ws:
         snapshot = ws.receive_json()
         assert snapshot["type"] == "room_snapshot"
 
@@ -182,7 +186,13 @@ def test_start_game_creates_game_and_broadcasts() -> None:
             if msg["type"] == "game_started":
                 seen_game_started = True
                 assert msg["payload"]["game_id"] == body["game_id"]
-                assert joined["player_token"] in msg["payload"]["tokens"]
+                # Each socket receives only its own game_token — the
+                # full lobby->game_token map must never be broadcast.
+                assert "tokens" not in msg["payload"]
+                assert isinstance(msg["payload"]["game_token"], str)
+                # The guest's socket must receive the guest's token,
+                # never the host's.
+                assert msg["payload"]["game_token"] != body["game_token"]
                 break
         assert seen_game_started
 
@@ -191,8 +201,11 @@ def test_ws_room_snapshot_then_live_update() -> None:
     client = TestClient(app)
     data = _create_room(client)
     room_id = data["room"]["room_id"]
+    host_token = data["player_token"]
 
-    with client.websocket_connect(f"/ws/rooms/{room_id}") as ws:
+    with client.websocket_connect(
+        f"/ws/rooms/{room_id}?player_token={host_token}"
+    ) as ws:
         snapshot = ws.receive_json()
         assert snapshot["type"] == "room_snapshot"
         assert len(snapshot["payload"]["players"]) == 1
@@ -209,16 +222,50 @@ def test_ws_unknown_room_closes_4404() -> None:
     client = TestClient(app)
     from starlette.websockets import WebSocketDisconnect
 
-    with client.websocket_connect("/ws/rooms/NOPE42") as ws:
+    with client.websocket_connect(
+        "/ws/rooms/NOPE42?player_token=whatever"
+    ) as ws:
         with pytest.raises(WebSocketDisconnect) as excinfo:
             ws.receive_json()
         assert excinfo.value.code == 4404
 
 
+def test_ws_without_player_token_closes_4401() -> None:
+    """An anonymous socket must not receive room state or tokens."""
+    client = TestClient(app)
+    from starlette.websockets import WebSocketDisconnect
+
+    data = _create_room(client)
+    room_id = data["room"]["room_id"]
+
+    with client.websocket_connect(f"/ws/rooms/{room_id}") as ws:
+        with pytest.raises(WebSocketDisconnect) as excinfo:
+            ws.receive_json()
+        assert excinfo.value.code == 4401
+
+
+def test_ws_with_foreign_player_token_closes_4401() -> None:
+    """A token that doesn't belong to this room must be rejected."""
+    client = TestClient(app)
+    from starlette.websockets import WebSocketDisconnect
+
+    data = _create_room(client)
+    room_id = data["room"]["room_id"]
+    other = _create_room(client, name="Eve", color="blue")
+    other_token = other["player_token"]
+
+    with client.websocket_connect(
+        f"/ws/rooms/{room_id}?player_token={other_token}"
+    ) as ws:
+        with pytest.raises(WebSocketDisconnect) as excinfo:
+            ws.receive_json()
+        assert excinfo.value.code == 4401
+
+
 def test_ws_connect_after_start_replays_game_started() -> None:
     """A socket that opens *after* the host pressed Start must still be
-    told the game has started and receive the lobby->game token map, or
-    reconnecting players would be stuck in the lobby forever."""
+    told the game has started and receive *only* its own game_token — we
+    must never expose other players' tokens to a reconnecting client."""
     client = TestClient(app)
     host = _create_room(client)
     room_id = host["room"]["room_id"]
@@ -236,7 +283,10 @@ def test_ws_connect_after_start_replays_game_started() -> None:
     ).json()
 
     # Guest reconnects (e.g. refreshed the tab) *after* Start fired.
-    with client.websocket_connect(f"/ws/rooms/{room_id}") as ws:
+    guest_token = joined["player_token"]
+    with client.websocket_connect(
+        f"/ws/rooms/{room_id}?player_token={guest_token}"
+    ) as ws:
         snapshot = ws.receive_json()
         assert snapshot["type"] == "room_snapshot"
         assert snapshot["payload"]["game_id"] == start["game_id"]
@@ -244,7 +294,9 @@ def test_ws_connect_after_start_replays_game_started() -> None:
         replay = ws.receive_json()
         assert replay["type"] == "game_started"
         assert replay["payload"]["game_id"] == start["game_id"]
-        # Both lobby tokens must be present so each client can resolve its own.
-        tokens = replay["payload"]["tokens"]
-        assert host_token in tokens
-        assert joined["player_token"] in tokens
+        # Only this client's own game_token — never the full map.
+        assert "tokens" not in replay["payload"]
+        game_token = replay["payload"]["game_token"]
+        assert isinstance(game_token, str) and game_token
+        # And crucially it must not be the host's token.
+        assert game_token != start["game_token"]
