@@ -21,6 +21,7 @@ import { bindFpsCounter } from "./ui/fpsCounter";
 import { bindCreateRoom, resumeAsHost } from "./ui/menu/createRoom";
 import { bindJoinRoom, resumeAsGuest } from "./ui/menu/joinRoom";
 import { bindMainMenu } from "./ui/menu/mainMenu";
+import { bindMockGameButton } from "./ui/menu/mockGame";
 import { bindMultiplayer } from "./ui/menu/multiplayer";
 import { bootstrapSettings, bindSettings } from "./ui/menu/settings";
 import { bindSinglePlayer } from "./ui/menu/singleplayer";
@@ -58,6 +59,7 @@ registerPendingCallbacks({
 // ---- Static DOM bindings (sidebar, dialog buttons, canvas listeners).
 bindSidebar();
 bindMainMenu();
+bindMockGameButton();
 bindSinglePlayer();
 bindMultiplayer();
 bindCreateRoom();

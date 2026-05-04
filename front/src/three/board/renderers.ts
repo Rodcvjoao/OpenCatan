@@ -10,7 +10,7 @@ import { createForestCluster } from "../flora/trees";
 import { createMountainCluster } from "../flora/mountains";
 import { createPastureCluster } from "../flora/pasture";
 import { createFarmCluster } from "../flora/farms";
-import { createBrickyardCluster } from "../flora/brickyards";
+import { createBrickFarmCluster } from "../flora/brickFarm";
 import {
   PORT_POST_HEIGHT,
   boatCabinGeo,
@@ -119,7 +119,7 @@ export function renderTile(
     setUserData(farm, { type: "tile", id: tileId });
     boardGroup.add(farm);
   } else if (resource === "brick") {
-    const brickyard = createBrickyardCluster(tileId);
+    const brickyard = createBrickFarmCluster(tileId);
     brickyard.position.set(x, HEX_HEIGHT / 2 + 0.02, z);
     setUserData(brickyard, { type: "tile", id: tileId });
     boardGroup.add(brickyard);
