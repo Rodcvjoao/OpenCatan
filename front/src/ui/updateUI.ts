@@ -2,6 +2,7 @@
 
 import { renderActionButtons } from "./actions";
 import { renderDiceDisplay } from "./dice";
+import { renderGameOverDialog } from "./gameOver";
 import { renderPlayerCards } from "./players";
 import { renderResourceBar } from "./resources";
 import { renderGameStatus } from "./status";
@@ -12,4 +13,5 @@ export function updateUI(): void {
   renderActionButtons();
   renderGameStatus();
   renderDiceDisplay();
+  renderGameOverDialog();
 }

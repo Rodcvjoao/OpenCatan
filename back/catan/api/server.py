@@ -23,6 +23,8 @@ from catan.api.schemas import (
     RoomMembershipResponse,
     RoomState,
     RoomStateResponse,
+    ReturnToLobbyRequest,
+    ReturnToLobbyResponse,
     SetReadyRequest,
     StartGameRequest,
     StartGameResponse,
@@ -298,6 +300,21 @@ async def game_ws(game_id: str, websocket: WebSocket) -> None:
 
 def _room_state(room) -> RoomState:
     return RoomState.model_validate(room.to_public_dict())
+
+
+@app.post("/games/{game_id}/return-to-lobby", response_model=ReturnToLobbyResponse)
+async def return_to_lobby(
+    game_id: str,
+    request: ReturnToLobbyRequest,
+) -> ReturnToLobbyResponse:
+    try:
+        room, lobby_token = lobby.return_to_lobby(game_id, request.player_token)
+    except LobbyError as exc:
+        status = 404 if "not found" in str(exc).lower() else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+
+    await _broadcast_room(room.room_id)
+    return ReturnToLobbyResponse(room=_room_state(room), player_token=lobby_token)
 
 
 async def _broadcast_room(room_id: str) -> None:
