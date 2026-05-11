@@ -81,10 +81,10 @@ export function renderActionButtons(): void {
     }
   }
   if (GameState.interactionMode === "move_robber") {
-    el.appendChild(banner("Click a tile to move the robber", "red"));
+    el.appendChild(banner("🔴 Selecione um terreno para mover o Ladrão", "red"));
   }
   if (GameState.interactionMode === "play_knight") {
-    el.appendChild(banner("Click a tile for the knight", "green"));
+    el.appendChild(banner("🔴 Selecione um terreno para jogar o Cavaleiro", "red"));
   }
   if (GameState.interactionMode === "play_road_building") {
     const picked = GameState.pendingRoadBuildingEdgeIds.length;

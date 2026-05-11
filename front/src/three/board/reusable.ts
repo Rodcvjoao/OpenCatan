@@ -186,6 +186,7 @@ import {
   hlCityMat,
   hlRoadMat,
   hlRobberMat,
+  hlRobberMatDim,
   hlSettlementMat,
   portCrateMat,
   portDarkWoodMat,
@@ -383,4 +384,5 @@ export const reusableMaterials = new Set<THREE.Material>([
   hlRoadMat,
   hlCityMat,
   hlRobberMat,
+  hlRobberMatDim,
 ]);

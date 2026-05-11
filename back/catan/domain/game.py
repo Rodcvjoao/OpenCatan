@@ -386,6 +386,8 @@ class CatanGame:
             tile_id = int(tile_id)
             if tile_id not in self.board.tiles:
                 raise ValueError("Invalid tile id")
+            if self.board.robber is not None and self.board.robber.tile_id == tile_id:
+                raise ValueError("Robber must be moved to a different tile")
             victim_id = payload.get("victim_id")
             if victim_id is not None:
                 victims = self.rules.robber_victims(
@@ -506,6 +508,8 @@ class CatanGame:
     ) -> ResourceType | None:
         if self.phase == GamePhase.FINISHED:
             raise ValueError("Game is finished")
+        if self.board.robber is not None and self.board.robber.tile_id == tile_id:
+            raise ValueError("Robber must be moved to a different tile")
         if from_robber_roll:
             if self.phase != GamePhase.MAIN:
                 raise ValueError("Action only available in main phase")
