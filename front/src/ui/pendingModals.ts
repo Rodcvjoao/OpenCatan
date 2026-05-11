@@ -3,7 +3,8 @@
 
 import { GameState, hasLegalAction, isMyTurn } from "../state";
 import { showDiscardDialog } from "./dialogs/discard";
-import { showTradeOfferDialog } from "./dialogs/tradeOffer";
+import { showTradeOfferDialog, syncTradeOfferDialog } from "./dialogs/tradeOffer";
+import { hideWaitingDiscardDialog, syncWaitingDiscardDialog } from "./dialogs/waitingDiscard";
 
 type VoidFn = () => void;
 let rebuildSceneFn: VoidFn = () => {};
@@ -18,9 +19,16 @@ export function registerPendingCallbacks(callbacks: {
 }
 
 export function checkPendingModals(): void {
-  if (!GameState.publicState) return;
+  if (!GameState.publicState) {
+    hideWaitingDiscardDialog();
+    return;
+  }
+  syncTradeOfferDialog();
   const pending = GameState.publicState.pending;
-  if (!pending) return;
+  if (!pending) {
+    hideWaitingDiscardDialog();
+    return;
+  }
 
   if (pending.pending_trade_offer) {
     const offer = pending.pending_trade_offer;
@@ -37,10 +45,13 @@ export function checkPendingModals(): void {
   if (pending.pending_discards && GameState.myPlayerId != null) {
     const required = pending.pending_discards[String(GameState.myPlayerId)];
     if (required && required > 0) {
+      hideWaitingDiscardDialog();
       showDiscardDialog(required);
       return;
     }
   }
+
+  syncWaitingDiscardDialog();
 
   // Robber move required
   if (pending.robber_move_required && isMyTurn()) {

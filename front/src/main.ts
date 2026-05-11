@@ -16,6 +16,7 @@ import {
 } from "./ui/actions";
 import { registerActionCallbacks } from "./ui/commands";
 import { bindDiscardDialog } from "./ui/dialogs/discard";
+import { bindInfoDialog } from "./ui/dialogs/info";
 import { bindVictimDialog } from "./ui/dialogs/victim";
 import { bindFpsCounter } from "./ui/fpsCounter";
 import { bindGameOverDialog } from "./ui/gameOver";
@@ -67,6 +68,7 @@ bindCreateRoom();
 bindJoinRoom();
 bindSettings();
 bindDiscardDialog();
+bindInfoDialog();
 bindVictimDialog();
 bindFpsCounter();
 bindGameOverDialog();

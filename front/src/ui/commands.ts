@@ -4,10 +4,10 @@ import { apiCommand } from "../net/api";
 import {
   GameState,
   hasLegalAction,
-  playersList,
 } from "../state";
 import type { InteractionMode } from "../types";
 import { showDevelopmentResourceDialog } from "./dialogs/development";
+import { openTradeDialog } from "./dialogs/tradeOffer";
 import { showToast } from "./toast";
 
 // `toggleMode` is exported so the action bar can flip interactionMode and
@@ -95,39 +95,16 @@ export async function doBuyDevCard(): Promise<void> {
   }
 }
 
-export async function doProposeTradeOffer(): Promise<void> {
-  if (!hasLegalAction("propose_trade_offer")) {
-    showToast("Trade offer not available right now", "warning");
-    return;
-  }
-  const others = playersList().filter((p) => p.id !== GameState.myPlayerId);
-  if (others.length === 0) {
-    showToast("No trade target available", "warning");
-    return;
-  }
-  const target = others[0];
-  const result = await apiCommand("propose_trade_offer", {
-    to_player_id: target.id,
-    give: { brick: 1 },
-    receive: { wool: 1 },
-  });
-  if (result && result.accepted) {
-    showToast("Trade offer sent to " + target.name, "success");
-  }
+export function doProposeTradeOffer(): void {
+  openTradeDialog("player");
 }
 
-export async function doBankTrade(): Promise<void> {
+export function doBankTrade(): void {
   if (!hasLegalAction("trade_bank")) {
     showToast("Bank trade not available right now", "warning");
     return;
   }
-  const result = await apiCommand("trade_bank", {
-    give: { brick: 4 },
-    receive: { ore: 1 },
-  });
-  if (result && result.accepted) {
-    showToast("Bank trade executed", "success");
-  }
+  openTradeDialog("bank");
 }
 
 export async function doEndTurn(): Promise<void> {
