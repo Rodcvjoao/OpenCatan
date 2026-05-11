@@ -37,6 +37,7 @@ export async function handleBoardClick(
     GameState.pendingRobberTileId = id;
     const board = GameState.publicState?.board;
     if (!board) return;
+    if (id === board.robber_tile_id) return;
     const tile = board.tiles.find((t) => t.id === id);
     if (!tile) return;
     const victimIds = new Set<number>();
@@ -51,13 +52,19 @@ export async function handleBoardClick(
       }
     }
     if (victimIds.size > 0) {
-      showVictimDialog(id, [...victimIds]);
+      const cardCounts: Record<number, number> = {};
+      for (const vid of victimIds) {
+        const p = GameState.publicState?.players.find((player) => player.id === vid);
+        if (p) cardCounts[vid] = p.resource_count;
+      }
+      showVictimDialog(id, [...victimIds], "move_robber", cardCounts);
     } else {
       await apiCommand("move_robber", { tile_id: id });
     }
   } else if (mode === "play_knight" && type === "tile") {
     const board = GameState.publicState?.board;
     if (!board) return;
+    if (id === board.robber_tile_id) return;
     const tile = board.tiles.find((t) => t.id === id);
     if (!tile) return;
     const victimIds = new Set<number>();
@@ -72,7 +79,12 @@ export async function handleBoardClick(
       }
     }
     if (victimIds.size > 0) {
-      showVictimDialog(id, [...victimIds], "play_knight");
+      const cardCounts: Record<number, number> = {};
+      for (const vid of victimIds) {
+        const p = GameState.publicState?.players.find((player) => player.id === vid);
+        if (p) cardCounts[vid] = p.resource_count;
+      }
+      showVictimDialog(id, [...victimIds], "play_knight", cardCounts);
     } else {
       const result = await apiCommand("play_development_card", {
         card_type: "knight",

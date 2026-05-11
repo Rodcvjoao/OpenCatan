@@ -23,7 +23,8 @@ export function startRoomWs(options: {
   onRoomUpdate: RoomWsUpdate;
   onGameStartFailed?: (err: unknown) => void;
 }): RoomWsConnection {
-  return connectRoomWs(options.roomId, options.playerToken, (event) => {
+  let connection: RoomWsConnection | null = null;
+  connection = connectRoomWs(options.roomId, options.playerToken, (event) => {
     if (event.type === "room_snapshot" || event.type === "room_updated") {
       options.onRoomUpdate(event.payload);
       return;
@@ -36,11 +37,13 @@ export function startRoomWs(options: {
         );
         return;
       }
+      connection?.close();
       void enterGame(event.payload.game_id, gameToken).catch((err) =>
         options.onGameStartFailed?.(err),
       );
     }
   });
+  return connection;
 }
 
 /** Fetch the game's state, seed GameState, open the game WS, close the

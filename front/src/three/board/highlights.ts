@@ -16,6 +16,7 @@ import {
   hlCityMat,
   hlRoadMat,
   hlRobberMat,
+  hlRobberMatDim,
   hlSettlementMat,
 } from "../materials";
 import { boardGroup } from "../scene";
@@ -96,13 +97,20 @@ export function renderInteractionHighlights(): void {
   } else if (mode === "move_robber" || mode === "play_knight") {
     const robberTileId = board.robber_tile_id;
     for (const tile of board.tiles) {
-      if (tile.id === robberTileId) continue;
       const pos = GameState.tilePositions[tile.id];
       if (!pos) continue;
-      const marker = new THREE.Mesh(robberHighlightGeo, hlRobberMat);
-      marker.position.set(pos.x, HEX_HEIGHT / 2 + 0.5, pos.z);
-      setUserData(marker, { type: "tile", id: tile.id });
-      boardGroup.add(marker);
+      if (tile.id === robberTileId) {
+        // Tile atual do ladrão: overlay cinza estático, sem userData → não clicável.
+        const dim = new THREE.Mesh(robberHighlightGeo, hlRobberMatDim);
+        dim.position.set(pos.x, HEX_HEIGHT / 2 + 0.5, pos.z);
+        boardGroup.add(dim);
+      } else {
+        // Tiles válidos: overlay laranja pulsante + userData para o click handler.
+        const marker = new THREE.Mesh(robberHighlightGeo, hlRobberMat);
+        marker.position.set(pos.x, HEX_HEIGHT / 2 + 0.5, pos.z);
+        setUserData(marker, { type: "tile", id: tile.id });
+        boardGroup.add(marker);
+      }
     }
   }
 }

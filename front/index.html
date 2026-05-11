@@ -223,6 +223,15 @@
         </div>
       </div>
 
+      <!-- ===== Game Over ===== -->
+      <div id="screen-game-over" class="hidden bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[420px] shadow-2xl text-center">
+        <h2 id="game-over-winner" class="font-game text-yellow-400 text-3xl mb-5">Game Over</h2>
+        <div class="flex justify-between">
+          <button id="btn-game-over-menu" class="btn-action px-5 py-2 rounded font-bold text-[#3e2723]">Main Menu</button>
+          <button id="btn-game-over-lobby" class="btn-action px-6 py-2 rounded font-bold text-[#3e2723] text-lg">Return To Lobby</button>
+        </div>
+      </div>
+
     </div>
 
     <!-- Discard Dialog -->
@@ -238,7 +247,8 @@
     <!-- Robber Victim Dialog -->
     <div id="victim-dialog" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden">
       <div class="bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[350px] shadow-2xl">
-        <h2 class="font-game text-yellow-400 text-xl text-center mb-3">Steal From</h2>
+        <h2 class="font-game text-yellow-400 text-xl text-center mb-1">Steal From</h2>
+        <div id="victim-step-hint" class="text-white text-sm text-center mb-4">Escolha um jogador para roubar.</div>
         <div id="victim-buttons" class="space-y-2"></div>
         <button id="victim-skip" class="text-yellow-600 text-sm mt-3 block mx-auto">Skip (no steal)</button>
       </div>

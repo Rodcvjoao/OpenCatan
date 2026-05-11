@@ -264,8 +264,31 @@ export const hlCityMat = new THREE.MeshStandardMaterial({
   transparent: true,
   opacity: 0.5,
 });
+/**
+ * hlRobberMat — overlay dos tiles VÁLIDOS para mover o ladrão.
+ * A cor base é um laranja-avermelhado. `emissiveIntensity` é animada em
+ * animate.ts com Math.abs(Math.sin(time)) para o efeito de pulsação de brilho.
+ * `side: THREE.DoubleSide` garante visibilidade de qualquer ângulo de câmera.
+ */
 export const hlRobberMat = new THREE.MeshStandardMaterial({
-  color: 0xff0000,
+  color: 0xff4500,        // laranja-avermelhado visível à luz ambiente
+  emissive: new THREE.Color(0xff2200),  // tom de brilho emitido
+  emissiveIntensity: 0.0, // começa em 0; o loop de animação controla o pulso
   transparent: true,
-  opacity: 0.4,
+  opacity: 0.55,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+});
+
+/**
+ * hlRobberMatDim — overlay do tile ATUAL do ladrão (onde ele já está).
+ * Visual cinza-escuro estático sinalizando que o tile não é interativo.
+ */
+export const hlRobberMatDim = new THREE.MeshStandardMaterial({
+  color: 0x444444,
+  emissive: new THREE.Color(0x000000),
+  transparent: true,
+  opacity: 0.35,
+  side: THREE.DoubleSide,
+  depthWrite: false,
 });

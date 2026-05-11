@@ -36,6 +36,13 @@ type WsMessage =
 
 let ws: WebSocket | null = null;
 
+export function disconnectWebSocket(): void {
+  if (!ws) return;
+  ws.onclose = null;
+  ws.close();
+  ws = null;
+}
+
 export function connectWebSocket(gameId: string): void {
   if (ws) {
     ws.onclose = null;

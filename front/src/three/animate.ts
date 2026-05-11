@@ -4,6 +4,7 @@
 import * as THREE from "three";
 
 import { HEX_SIZE } from "../config";
+import { GameState } from "../state";
 import { fpsFrame } from "../ui/fpsCounter";
 import { pointInConvexPoly } from "./flora/pasture";
 import { animateDiceRoller } from "./diceRoller";
@@ -23,6 +24,7 @@ import {
   scene,
 } from "./scene";
 import { hoverTokenMat, hoverTokenPivot } from "./input/hoverToken";
+import { hlRobberMat } from "./materials";
 
 type SheepUserData = {
   body?: THREE.Object3D;
@@ -319,6 +321,22 @@ export function animate(): void {
   if (hoverTokenPivot.visible) {
     hoverTokenPivot.rotation.y += 0.025;
   }
+
+  // ── Robber tile highlight pulse ────────────────────────────────────────
+  // Animate emissiveIntensity only while the player is choosing a robber
+  // destination. Resetting to 0 when inactive prevents a frozen bright glow
+  // if the mode changes between renders (e.g. after state update).
+  const robberMode = GameState.interactionMode;
+  if (robberMode === "move_robber" || robberMode === "play_knight") {
+    // Pulse period ≈ π seconds (≈ 3 s full cycle). Math.abs keeps it 0–1.
+    hlRobberMat.emissiveIntensity = Math.abs(Math.sin(time * 2.0)) * 0.85;
+  } else if (hlRobberMat.emissiveIntensity !== 0) {
+    // Snap to 0 so the material is ready for the next interaction without
+    // leftover brightness from a previous turn.
+    hlRobberMat.emissiveIntensity = 0;
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
   animateDiceRoller(nowMs);
   renderer.render(scene, camera);
   fpsFrame(nowMs);

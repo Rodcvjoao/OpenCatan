@@ -14,6 +14,7 @@ export type Screen =
   | "mp-join"
   | "mp-lobby-guest"
   | "settings"
+  | "game-over"
   | "none";
 
 const PANEL_IDS: Record<Exclude<Screen, "none">, string> = {
@@ -25,6 +26,7 @@ const PANEL_IDS: Record<Exclude<Screen, "none">, string> = {
   "mp-join":       "screen-mp-join",
   "mp-lobby-guest":"screen-mp-lobby-guest",
   settings:        "screen-settings",
+  "game-over":     "screen-game-over",
 };
 
 let current: Screen = "main";

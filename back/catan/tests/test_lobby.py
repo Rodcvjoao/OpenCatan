@@ -103,6 +103,31 @@ def test_join_rejects_after_game_started() -> None:
         manager.join_room(room.room_id, "Carol", "white")
 
 
+def test_public_join_rejects_return_lobby() -> None:
+    store = InMemoryGameStore()
+    manager = LobbyManager(store)
+    room, host = manager.create_room("Alice", "red")
+    _, bob = manager.join_room(room.room_id, "Bob", "blue")
+    manager.set_ready(room.room_id, bob.player_token, True)
+    started = manager.start_game(room.room_id, host.player_token)
+    assert started.game_id is not None
+
+    session = store.get(started.game_id)
+    session.game.player_by_id(1).settlement_vertex_ids.update(range(10))
+    assert session.game.check_winner() is not None
+
+    return_room, return_token = manager.return_to_lobby(
+        started.game_id,
+        started.lobby_to_game_token[host.player_token],
+    )
+
+    with pytest.raises(LobbyError, match="players from the finished game"):
+        manager.join_room(return_room.room_id, "Carol", "white")
+
+    manager.change_color(return_room.room_id, return_token, "white")
+    assert return_room.players[0].color == "white"
+
+
 # ---- Ready toggle ----
 
 

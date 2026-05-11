@@ -177,3 +177,123 @@ def test_two_step_trade_flow() -> None:
 
     assert gp1.resources.get(ResourceType.WOOL, 0) >= 1
     assert gp2.resources.get(ResourceType.BRICK, 0) >= 1
+
+
+def test_finished_room_game_can_return_players_to_lobby() -> None:
+    client = TestClient(app)
+    room_response = client.post(
+        "/rooms",
+        json={"name": "Alice", "color": "red"},
+    )
+    room_body = room_response.json()
+    room_id = room_body["room"]["room_id"]
+    host_lobby_token = room_body["player_token"]
+
+    join_response = client.post(
+        f"/rooms/{room_id}/join",
+        json={"name": "Bob", "color": "blue"},
+    )
+    guest_lobby_token = join_response.json()["player_token"]
+
+    ready = client.post(
+        f"/rooms/{room_id}/ready",
+        json={"player_token": guest_lobby_token, "ready": True},
+    )
+    assert ready.status_code == 200
+
+    started = client.post(
+        f"/rooms/{room_id}/start",
+        json={"player_token": host_lobby_token},
+    )
+    assert started.status_code == 200
+    game_id = started.json()["game_id"]
+    host_game_token = started.json()["game_token"]
+
+    guest_game_token = next(
+        token
+        for token, player_id in store.get(game_id).player_tokens.items()
+        if player_id == 2
+    )
+
+    early = client.post(
+        f"/games/{game_id}/return-to-lobby",
+        json={"player_token": host_game_token},
+    )
+    assert early.status_code == 400
+
+    session = store.get(game_id)
+    session.game.player_by_id(1).settlement_vertex_ids.update(range(10))
+    assert session.game.check_winner() is not None
+
+    host_return = client.post(
+        f"/games/{game_id}/return-to-lobby",
+        json={"player_token": host_game_token},
+    )
+    assert host_return.status_code == 200
+    assert host_return.json()["room"]["room_id"] == room_id
+    assert host_return.json()["player_token"] != host_lobby_token
+    assert host_return.json()["room"]["game_id"] is None
+    assert [p["name"] for p in host_return.json()["room"]["players"]] == ["Alice"]
+    assert [p["ready"] for p in host_return.json()["room"]["players"]] == [True]
+
+    blocked_join = client.post(
+        f"/rooms/{room_id}/join",
+        json={"name": "Mallory", "color": "white"},
+    )
+    assert blocked_join.status_code == 400
+    assert "players from the finished game" in blocked_join.json()["detail"]
+
+    guest_return = client.post(
+        f"/games/{game_id}/return-to-lobby",
+        json={"player_token": guest_game_token},
+    )
+
+    assert guest_return.status_code == 200
+    assert guest_return.json()["room"]["room_id"] == room_id
+    assert guest_return.json()["player_token"] != guest_lobby_token
+    assert [p["name"] for p in guest_return.json()["room"]["players"]] == [
+        "Alice",
+        "Bob",
+    ]
+    assert [p["ready"] for p in guest_return.json()["room"]["players"]] == [
+        True,
+        False,
+    ]
+
+
+def test_finished_direct_game_creates_return_lobby() -> None:
+    client = TestClient(app)
+    create_response = client.post(
+        "/games",
+        json={
+            "players": [
+                {"name": "Alice", "color": "red"},
+                {"name": "Bob", "color": "blue"},
+            ]
+        },
+    )
+    game = create_response.json()
+    game_id = game["game_id"]
+    players = sorted(game["players"], key=lambda item: item["player_id"])
+
+    session = store.get(game_id)
+    session.game.player_by_id(1).settlement_vertex_ids.update(range(10))
+    assert session.game.check_winner() is not None
+
+    alice_return = client.post(
+        f"/games/{game_id}/return-to-lobby",
+        json={"player_token": players[0]["token"]},
+    )
+    bob_return = client.post(
+        f"/games/{game_id}/return-to-lobby",
+        json={"player_token": players[1]["token"]},
+    )
+
+    assert alice_return.status_code == 200
+    assert bob_return.status_code == 200
+    assert alice_return.json()["room"]["room_id"] == bob_return.json()["room"]["room_id"]
+    assert [p["name"] for p in alice_return.json()["room"]["players"]] == ["Alice"]
+    assert [p["name"] for p in bob_return.json()["room"]["players"]] == [
+        "Alice",
+        "Bob",
+    ]

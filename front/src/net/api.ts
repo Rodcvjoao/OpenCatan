@@ -3,6 +3,7 @@
 import { API_BASE } from "../config";
 import { GameState, updateState } from "../state";
 import { showToast } from "../ui/toast";
+import type { RoomState } from "./lobbyApi";
 import type {
   CommandName,
   CommandResponse,
@@ -44,6 +45,25 @@ export async function apiGetState(
     return null;
   }
   return (await res.json()) as StateEnvelope;
+}
+
+export async function apiReturnToLobby(
+  gameId: string,
+  playerToken: string,
+): Promise<{
+  room: RoomState;
+  player_token: string;
+} | null> {
+  const res = await fetch(`${API_BASE}/games/${gameId}/return-to-lobby`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ player_token: playerToken }),
+  });
+  if (!res.ok) {
+    showToast("Failed to return to lobby: " + res.statusText, "error");
+    return null;
+  }
+  return (await res.json()) as { room: RoomState; player_token: string };
 }
 
 export async function apiCommand(

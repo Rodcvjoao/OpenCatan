@@ -19,6 +19,7 @@ import { bindDiscardDialog } from "./ui/dialogs/discard";
 import { bindInfoDialog } from "./ui/dialogs/info";
 import { bindVictimDialog } from "./ui/dialogs/victim";
 import { bindFpsCounter } from "./ui/fpsCounter";
+import { bindGameOverDialog } from "./ui/gameOver";
 import { bindCreateRoom, resumeAsHost } from "./ui/menu/createRoom";
 import { bindJoinRoom, resumeAsGuest } from "./ui/menu/joinRoom";
 import { bindMainMenu } from "./ui/menu/mainMenu";
@@ -70,6 +71,7 @@ bindDiscardDialog();
 bindInfoDialog();
 bindVictimDialog();
 bindFpsCounter();
+bindGameOverDialog();
 installInputListeners();
 installResizeHandler();
 

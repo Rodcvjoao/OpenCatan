@@ -132,6 +132,15 @@ class RoomStateResponse(BaseModel):
     room: RoomState
 
 
+class ReturnToLobbyRequest(BaseModel):
+    player_token: str = Field(min_length=1)
+
+
+class ReturnToLobbyResponse(BaseModel):
+    room: RoomState
+    player_token: str
+
+
 class StartGameResponse(BaseModel):
     game_id: str
     # The game token for the player who called Start. Other players learn
