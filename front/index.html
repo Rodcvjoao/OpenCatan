@@ -244,6 +244,43 @@
       </div>
     </div>
 
+    <!-- Waiting For Discard Dialog -->
+    <div id="waiting-discard-dialog" class="fixed inset-0 bg-black/60 flex items-center justify-center z-40 hidden pointer-events-none p-4">
+      <div class="bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-full max-w-[460px] shadow-2xl">
+        <h2 class="font-game text-yellow-400 text-2xl text-center mb-2">Waiting For Discard</h2>
+        <p id="waiting-discard-info" class="text-white text-sm text-center leading-6"></p>
+      </div>
+    </div>
+
+    <!-- Info Dialog -->
+    <div id="info-dialog" class="fixed inset-0 bg-black/75 flex items-center justify-center z-50 hidden p-4">
+      <div class="w-full max-w-[860px] max-h-[calc(100vh-2rem)] overflow-y-auto bg-[#3e2723] border-2 border-yellow-700 rounded-2xl shadow-2xl">
+        <div class="sticky top-0 bg-[#3e2723] border-b border-yellow-800 px-6 py-4 flex items-start justify-between gap-4">
+          <div>
+            <p class="text-yellow-500 text-xs font-bold uppercase tracking-[0.2em]">Match Info</p>
+            <h2 class="font-game text-yellow-400 text-3xl">Game Overview</h2>
+          </div>
+          <button id="info-close" class="btn-action px-4 py-2 rounded font-bold text-[#3e2723]" type="button">Close</button>
+        </div>
+        <div id="info-content" class="p-6"></div>
+      </div>
+    </div>
+
+    <!-- Trade Dialog -->
+    <div id="trade-dialog" class="fixed inset-0 bg-black/75 flex items-center justify-center z-50 hidden p-4">
+      <div class="trade-shell w-full max-w-[720px] rounded-[28px] border-2 border-amber-600 shadow-2xl overflow-hidden">
+        <div class="trade-header px-6 py-4 flex items-start justify-between gap-4">
+          <div>
+            <p class="trade-kicker">Trade Table</p>
+            <h2 class="font-game text-3xl text-[#fff3db] leading-none">Player Trade</h2>
+            <p id="trade-subtitle" class="text-[#fbe4b4] text-sm mt-2"></p>
+          </div>
+          <button id="trade-close" class="trade-close-btn" type="button" aria-label="Close trade dialog">Close</button>
+        </div>
+        <div id="trade-content" class="px-6 pb-6 pt-4"></div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
