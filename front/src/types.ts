@@ -119,12 +119,17 @@ export interface Pending {
   setup?: PendingSetup | null;
 }
 
+export interface BankState {
+  resource_cards: Record<string, number>;
+  dev_cards_remaining: number;
+}
+
 export interface PublicState {
   phase: Phase;
   turn: Turn | null;
   board: Board;
   players: PlayerPublic[];
-  bank?: Record<string, number>;
+  bank?: BankState;
   pending?: Pending | null;
 }
 

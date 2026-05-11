@@ -150,12 +150,13 @@ function bankSummaryHtml(): string {
   if (!bank) {
     return '<p class="text-white/80 text-sm">The bank counts are not available right now.</p>';
   }
+  const resourceCards = bank.resource_cards ?? {};
   return `
     <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
       ${RESOURCE_ORDER.map((resource) => `
         <div class="bg-black/25 border border-yellow-900 rounded-xl px-3 py-3">
           <div class="text-yellow-400 text-[11px] font-bold uppercase">${RESOURCE_LABELS[resource]}</div>
-          <div class="text-white text-xl font-game mt-1">${bank[resource] ?? 0}</div>
+          <div class="text-white text-xl font-game mt-1">${resourceCards[resource] ?? 0}</div>
         </div>
       `).join("")}
     </div>

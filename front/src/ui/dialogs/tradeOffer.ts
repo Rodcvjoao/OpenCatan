@@ -50,6 +50,15 @@ const bankDraft: BankDraftState = {
 let outgoingTradeTracker: OutgoingTradeTracker | null = null;
 let currentTradeMode: TradeDialogMode = "player";
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function currentOffer(): TradeOffer | null {
   return GameState.publicState?.pending?.pending_trade_offer ?? null;
 }
@@ -116,7 +125,7 @@ function renderTargetOptions(): string {
   return targets
     .map((player) => {
       const selected = String(player.id) === draft.toPlayerId ? "selected" : "";
-      return `<option value="${player.id}" ${selected}>${player.name}</option>`;
+      return `<option value="${player.id}" ${selected}>${escapeHtml(player.name)}</option>`;
     })
     .join("");
 }
@@ -342,6 +351,8 @@ function bankTradeHtml(): string {
 function pendingOfferHtml(offer: TradeOffer, role: "incoming" | "outgoing" | "other"): string {
   const from = GameState.playerMap[offer.from_player_id];
   const to = GameState.playerMap[offer.to_player_id];
+  const fromName = escapeHtml(from?.name ?? "Player");
+  const toName = escapeHtml(to?.name ?? "Player");
   const statusLabel =
     role === "incoming"
       ? "Incoming offer"
@@ -372,7 +383,7 @@ function pendingOfferHtml(offer: TradeOffer, role: "incoming" | "outgoing" | "ot
       <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
           <p class="trade-kicker">${statusLabel}</p>
-          <h3 class="text-[#fff3db] font-bold text-xl">${from?.name ?? "Player"} to ${to?.name ?? "Player"}</h3>
+          <h3 class="text-[#fff3db] font-bold text-xl">${fromName} to ${toName}</h3>
           <p class="text-[#fbe4b4]/80 text-sm mt-1">${helperText}</p>
         </div>
         <div class="trade-summary-pill text-sm">Offer ID: ${offer.id.slice(0, 8)}</div>
@@ -396,12 +407,13 @@ function pendingOfferHtml(offer: TradeOffer, role: "incoming" | "outgoing" | "ot
 }
 
 function waitingOfferHtml(tracker: OutgoingTradeTracker): string {
+  const targetName = escapeHtml(tracker.targetName);
   return `
     <div class="trade-card p-5">
       <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
           <p class="trade-kicker">Waiting for answer</p>
-          <h3 class="text-[#fff3db] font-bold text-xl">Offer sent to ${tracker.targetName}</h3>
+          <h3 class="text-[#fff3db] font-bold text-xl">Offer sent to ${targetName}</h3>
           <p class="text-[#fbe4b4]/80 text-sm mt-1">The other player is deciding whether to accept or refuse your trade.</p>
         </div>
         <div class="trade-summary-pill text-sm">Pending response</div>
@@ -417,7 +429,7 @@ function waitingOfferHtml(tracker: OutgoingTradeTracker): string {
         </div>
       </div>
       <div class="mt-5 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-        <p class="text-[#fbe4b4]/75 text-sm">This window updates automatically when ${tracker.targetName} answers.</p>
+        <p class="text-[#fbe4b4]/75 text-sm">This window updates automatically when ${targetName} answers.</p>
         <div class="flex gap-3">
           <button id="trade-dismiss" type="button" class="btn-action trade-btn-secondary px-4 py-2 rounded font-bold">Minimize</button>
           <button id="trade-cancel-offer" type="button" class="btn-action trade-btn-danger px-5 py-2 rounded font-bold">Cancel Offer</button>
@@ -429,10 +441,11 @@ function waitingOfferHtml(tracker: OutgoingTradeTracker): string {
 
 function resolvedOfferHtml(tracker: OutgoingTradeTracker): string {
   const accepted = tracker.outcome === "accepted";
+  const targetName = escapeHtml(tracker.targetName);
   const title = accepted ? "Trade accepted" : "Trade refused";
   const helper = accepted
-    ? `${tracker.targetName} accepted your offer and the resources were exchanged.`
-    : `${tracker.targetName} refused your offer. No resources changed hands.`;
+    ? `${targetName} accepted your offer and the resources were exchanged.`
+    : `${targetName} refused your offer. No resources changed hands.`;
   const pill = accepted ? "Accepted" : "Refused";
   return `
     <div class="trade-card p-5">
