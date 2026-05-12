@@ -42,6 +42,29 @@ def _finish_setup(game: CatanGame) -> None:
             game.build_road(pid, value, setup_phase=True, pay_cost=False)
 
 
+def _complete_current_setup_turn(game: CatanGame) -> None:
+    player_id = game.current_player().id
+    if game.pending_setup_road_player_id is None:
+        for vertex_id in sorted(game.board.vertices):
+            if game.rules.validate_settlement_placement(
+                game, player_id, vertex_id, setup_phase=True
+            ):
+                game.build_settlement(
+                    player_id, vertex_id, setup_phase=True, pay_cost=False
+                )
+                break
+        else:
+            raise AssertionError(f"No valid setup settlement for player {player_id}")
+
+    for edge_id in sorted(game.board.edges):
+        if game.rules.validate_road_placement(
+            game, player_id, edge_id, setup_phase=True
+        ):
+            game.build_road(player_id, edge_id, setup_phase=True, pay_cost=False)
+            return
+    raise AssertionError(f"No valid setup road for player {player_id}")
+
+
 def test_setup_transitions_to_main_with_first_player() -> None:
     game = _game()
     _finish_setup(game)
@@ -167,6 +190,42 @@ def test_rejoin_game_restores_activity() -> None:
     assert not game.is_active_player(1)
     game.rejoin_game(1)
     assert game.is_active_player(1)
+
+
+def test_rejoin_during_setup_receives_skipped_turn() -> None:
+    game = _game_three()
+
+    game.leave_game(2)
+    _complete_current_setup_turn(game)
+    assert game.current_player().id == 3
+
+    game.rejoin_game(2)
+    _complete_current_setup_turn(game)
+
+    assert game.current_player().id == 2
+    assert "place_setup_settlement" in game.legal_actions_for_player(2)
+
+    _complete_current_setup_turn(game)
+    player = game.player_by_id(2)
+    assert len(player.settlement_vertex_ids) == 1
+    assert len(player.road_ids) == 1
+
+
+def test_inactive_players_do_not_count_against_bank_production() -> None:
+    game = _game()
+    game.inactive_player_ids.add(2)
+    game.bank.resource_cards[ResourceType.BRICK] = 1
+
+    game._apply_production(
+        {
+            1: {ResourceType.BRICK: 1},
+            2: {ResourceType.BRICK: 1},
+        }
+    )
+
+    assert game.player_by_id(1).resources[ResourceType.BRICK] == 1
+    assert game.player_by_id(2).resources.get(ResourceType.BRICK, 0) == 0
+    assert game.bank.resource_cards[ResourceType.BRICK] == 0
 
 
 def test_rejoin_game_after_finish_rejected() -> None:

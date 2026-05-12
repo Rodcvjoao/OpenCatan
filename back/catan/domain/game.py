@@ -141,14 +141,36 @@ class CatanGame:
                 return player_id
         return None
 
-    def _remove_from_setup_orders(self, player_id: int) -> None:
-        if player_id in self.setup_order:
-            index = self.setup_order.index(player_id)
-            self.setup_order.remove(player_id)
-            if index <= self.setup_index and self.setup_index > 0:
-                self.setup_index -= 1
-        if player_id in self.initial_player_order:
-            self.initial_player_order.remove(player_id)
+    def _setup_required_count(self) -> int:
+        return 1 if self.phase == GamePhase.SETUP_1 else 2
+
+    def _setup_counts(self, player_id: int) -> tuple[int, int]:
+        player = self.player_by_id(player_id)
+        settlements = len(player.settlement_vertex_ids) + len(player.city_vertex_ids)
+        return settlements, len(player.road_ids)
+
+    def _has_completed_setup_round(self, player_id: int) -> bool:
+        required = self._setup_required_count()
+        settlements, roads = self._setup_counts(player_id)
+        return settlements >= required and roads >= required
+
+    def _needs_setup_road_only(self, player_id: int) -> bool:
+        required = self._setup_required_count()
+        settlements, roads = self._setup_counts(player_id)
+        return settlements >= required and roads < required
+
+    def _setup_round_order(self) -> list[int]:
+        if self.phase == GamePhase.SETUP_2:
+            return list(reversed(self.initial_player_order))
+        return list(self.initial_player_order)
+
+    def _active_players_missing_setup_round(self) -> list[int]:
+        return [
+            player_id
+            for player_id in self._setup_round_order()
+            if self.is_active_player(player_id)
+            and not self._has_completed_setup_round(player_id)
+        ]
 
     def current_player(self) -> Player:
         self._ensure_current_player_active()
@@ -303,8 +325,6 @@ class CatanGame:
         if self.pending_setup_road_player_id == player_id:
             self.pending_setup_road_player_id = None
 
-        self._remove_from_setup_orders(player_id)
-
         if self.match_host_id == player_id:
             self.match_host_id = self._pick_new_host_id()
 
@@ -313,7 +333,7 @@ class CatanGame:
             return winner
 
         if was_current:
-            self._force_end_turn_after_leave()
+            self._force_end_turn_after_leave(player_id)
         return None
 
     def rejoin_game(self, player_id: int) -> None:
@@ -322,6 +342,7 @@ class CatanGame:
         if self.is_active_player(player_id):
             return
         self.inactive_player_ids.discard(player_id)
+        self._queue_rejoined_setup_player(player_id)
         if self.match_host_id is None or not self.is_active_player(self.match_host_id):
             self.match_host_id = self._pick_new_host_id()
         self._ensure_current_player_active()
@@ -335,25 +356,14 @@ class CatanGame:
             return None
         return self.player_by_id(active_ids[0])
 
-    def _force_end_turn_after_leave(self) -> None:
+    def _force_end_turn_after_leave(self, player_id: int) -> None:
         if self.phase in {GamePhase.SETUP_1, GamePhase.SETUP_2}:
-            if not self.setup_order:
-                return
-            if self.setup_index >= len(self.setup_order):
-                if self.phase == GamePhase.SETUP_1:
-                    self.phase = GamePhase.SETUP_2
-                    self.setup_round = 2
-                    self.setup_order = list(reversed(self.setup_order))
-                    self.setup_index = 0
-                else:
-                    self.phase = GamePhase.MAIN
-                    self.turn_manager.turn_phase = TurnPhase.ROLL
-                    self.turn_manager.turn_number = 1
-                    self.setup_round = 2
-                    self.setup_index = 0
-            if self.setup_order:
-                next_player_id = self.setup_order[self.setup_index]
-                self.current_player_index = self._player_index(next_player_id)
+            if (
+                self.setup_index < len(self.setup_order)
+                and self.setup_order[self.setup_index] == player_id
+            ):
+                self.setup_index += 1
+            self._advance_to_next_setup_player()
             return
 
         if self.phase != GamePhase.MAIN:
@@ -755,8 +765,13 @@ class CatanGame:
         return required
 
     def _apply_production(self, production: dict[int, dict[ResourceType, int]]) -> None:
+        active_production = {
+            player_id: bundle
+            for player_id, bundle in production.items()
+            if self.is_active_player(player_id)
+        }
         totals: dict[ResourceType, int] = {}
-        for bundle in production.values():
+        for bundle in active_production.values():
             for resource, amount in bundle.items():
                 totals[resource] = totals.get(resource, 0) + amount
 
@@ -766,9 +781,7 @@ class CatanGame:
             if self.bank.can_pay(resource, total)
         }
 
-        for player_id, bundle in production.items():
-            if not self.is_active_player(player_id):
-                continue
+        for player_id, bundle in active_production.items():
             player = self.player_by_id(player_id)
             for resource, amount in bundle.items():
                 if resource not in payable_resources:
@@ -782,25 +795,60 @@ class CatanGame:
             raise ValueError("Unexpected setup player turn")
 
         self.setup_index += 1
-        if self.setup_index < len(self.setup_order):
-            next_player_id = self.setup_order[self.setup_index]
-            self.current_player_index = self._player_index(next_player_id)
+        self._advance_to_next_setup_player()
+
+    def _queue_rejoined_setup_player(self, player_id: int) -> None:
+        if self.phase not in {GamePhase.SETUP_1, GamePhase.SETUP_2}:
+            return
+        if self._has_completed_setup_round(player_id):
+            return
+        if player_id in self.setup_order[self.setup_index :]:
+            return
+        insert_at = min(self.setup_index + 1, len(self.setup_order))
+        self.setup_order.insert(insert_at, player_id)
+
+    def _advance_to_next_setup_player(self) -> None:
+        while self.phase in {GamePhase.SETUP_1, GamePhase.SETUP_2}:
+            while self.setup_index < len(self.setup_order):
+                next_player_id = self.setup_order[self.setup_index]
+                if self.is_active_player(
+                    next_player_id
+                ) and not self._has_completed_setup_round(next_player_id):
+                    self.current_player_index = self._player_index(next_player_id)
+                    self.pending_setup_road_player_id = (
+                        next_player_id
+                        if self._needs_setup_road_only(next_player_id)
+                        else None
+                    )
+                    return
+                self.setup_index += 1
+
+            missing_players = self._active_players_missing_setup_round()
+            if missing_players:
+                self.setup_order.extend(missing_players)
+                continue
+
+            if self.phase == GamePhase.SETUP_1:
+                self._start_second_setup_round()
+                continue
+
+            self._enter_main_phase_after_setup()
             return
 
-        if self.phase == GamePhase.SETUP_1:
-            self.phase = GamePhase.SETUP_2
-            self.setup_round = 2
-            self.setup_order = list(reversed(self.setup_order))
-            self.setup_index = 0
-            next_player_id = self.setup_order[self.setup_index]
-            self.current_player_index = self._player_index(next_player_id)
-            return
+    def _start_second_setup_round(self) -> None:
+        self.phase = GamePhase.SETUP_2
+        self.setup_round = 2
+        self.setup_order = self._setup_round_order()
+        self.setup_index = 0
+        self.pending_setup_road_player_id = None
 
+    def _enter_main_phase_after_setup(self) -> None:
         self.phase = GamePhase.MAIN
         self.turn_manager.turn_phase = TurnPhase.ROLL
         self.turn_manager.turn_number = 1
         self.setup_round = 2
         self.setup_index = 0
+        self.pending_setup_road_player_id = None
         first_player_id = self._pick_new_host_id()
         if first_player_id is None:
             return
