@@ -3,16 +3,21 @@ from __future__ import annotations
 from typing import Any
 
 from catan.api.schemas import StateEnvelope
+from catan.domain.enums import GamePhase
 from catan.domain.game import CatanGame
 
 
 def game_public_state(game: CatanGame) -> dict[str, Any]:
     board = game.board
+    active_ids = set(game.active_player_ids())
+    current_player_id = None
+    if game.phase != GamePhase.FINISHED and active_ids:
+        current_player_id = game.current_player().id
     return {
         "phase": game.phase.name,
         "turn": {
             "number": game.turn_manager.turn_number,
-            "current_player_id": game.current_player().id,
+            "current_player_id": current_player_id,
             "turn_phase": game.turn_manager.turn_phase.name,
             "last_roll": game.last_roll,
             "last_roll_dice": (
@@ -81,6 +86,8 @@ def game_public_state(game: CatanGame) -> dict[str, Any]:
                 "id": player.id,
                 "name": player.name,
                 "color": player.color,
+                "is_active": player.id in active_ids,
+                "is_host": player.id == game.match_host_id,
                 "resource_count": player.resource_count(),
                 "dev_card_count": len(player.dev_cards_hand),
                 "roads": sorted(player.road_ids),

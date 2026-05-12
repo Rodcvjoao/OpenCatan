@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from catan.domain.enums import DevelopmentCardType, ResourceType
 from catan.domain.game import CatanGame
 from catan.domain.player import Player
@@ -9,6 +11,15 @@ def _game() -> CatanGame:
     players = [
         Player(id=1, name="Alice", color="red"),
         Player(id=2, name="Bob", color="blue"),
+    ]
+    return CatanGame.create(players)
+
+
+def _game_three() -> CatanGame:
+    players = [
+        Player(id=1, name="Alice", color="red"),
+        Player(id=2, name="Bob", color="blue"),
+        Player(id=3, name="Carol", color="white"),
     ]
     return CatanGame.create(players)
 
@@ -129,3 +140,38 @@ def test_pending_trade_offer_flow() -> None:
     assert game.pending_trade_offer is None
     assert p1.resources.get(ResourceType.WOOL, 0) >= 1
     assert p2.resources.get(ResourceType.BRICK, 0) >= 1
+
+
+def test_leave_game_marks_inactive_and_transfers_host() -> None:
+    game = _game_three()
+    assert game.match_host_id == 1
+
+    winner = game.leave_game(1)
+    assert winner is None
+    assert not game.is_active_player(1)
+    assert game.match_host_id in {2, 3}
+
+
+def test_leave_game_last_active_wins() -> None:
+    game = _game_three()
+    game.leave_game(1)
+    winner = game.leave_game(2)
+    assert winner is not None
+    assert winner.id == 3
+    assert game.phase.name == "FINISHED"
+
+
+def test_rejoin_game_restores_activity() -> None:
+    game = _game_three()
+    game.leave_game(1)
+    assert not game.is_active_player(1)
+    game.rejoin_game(1)
+    assert game.is_active_player(1)
+
+
+def test_rejoin_game_after_finish_rejected() -> None:
+    game = _game_three()
+    game.leave_game(1)
+    game.leave_game(2)
+    with pytest.raises(ValueError):
+        game.rejoin_game(1)

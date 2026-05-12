@@ -179,7 +179,7 @@ def test_two_step_trade_flow() -> None:
     assert gp2.resources.get(ResourceType.BRICK, 0) >= 1
 
 
-def test_finished_room_game_can_return_players_to_lobby() -> None:
+def test_room_game_can_return_players_to_lobby() -> None:
     client = TestClient(app)
     room_response = client.post(
         "/rooms",
@@ -215,16 +215,6 @@ def test_finished_room_game_can_return_players_to_lobby() -> None:
         if player_id == 2
     )
 
-    early = client.post(
-        f"/games/{game_id}/return-to-lobby",
-        json={"player_token": host_game_token},
-    )
-    assert early.status_code == 400
-
-    session = store.get(game_id)
-    session.game.player_by_id(1).settlement_vertex_ids.update(range(10))
-    assert session.game.check_winner() is not None
-
     host_return = client.post(
         f"/games/{game_id}/return-to-lobby",
         json={"player_token": host_game_token},
@@ -233,8 +223,14 @@ def test_finished_room_game_can_return_players_to_lobby() -> None:
     assert host_return.json()["room"]["room_id"] == room_id
     assert host_return.json()["player_token"] != host_lobby_token
     assert host_return.json()["room"]["game_id"] is None
-    assert [p["name"] for p in host_return.json()["room"]["players"]] == ["Alice"]
-    assert [p["ready"] for p in host_return.json()["room"]["players"]] == [True]
+    assert [p["name"] for p in host_return.json()["room"]["players"]] == [
+        "Alice",
+        "Bob",
+    ]
+    assert [p["ready"] for p in host_return.json()["room"]["players"]] == [
+        True,
+        False,
+    ]
 
     blocked_join = client.post(
         f"/rooms/{room_id}/join",
@@ -261,7 +257,7 @@ def test_finished_room_game_can_return_players_to_lobby() -> None:
     ]
 
 
-def test_finished_direct_game_creates_return_lobby() -> None:
+def test_direct_game_creates_return_lobby() -> None:
     client = TestClient(app)
     create_response = client.post(
         "/games",
@@ -276,10 +272,6 @@ def test_finished_direct_game_creates_return_lobby() -> None:
     game_id = game["game_id"]
     players = sorted(game["players"], key=lambda item: item["player_id"])
 
-    session = store.get(game_id)
-    session.game.player_by_id(1).settlement_vertex_ids.update(range(10))
-    assert session.game.check_winner() is not None
-
     alice_return = client.post(
         f"/games/{game_id}/return-to-lobby",
         json={"player_token": players[0]["token"]},
@@ -292,7 +284,10 @@ def test_finished_direct_game_creates_return_lobby() -> None:
     assert alice_return.status_code == 200
     assert bob_return.status_code == 200
     assert alice_return.json()["room"]["room_id"] == bob_return.json()["room"]["room_id"]
-    assert [p["name"] for p in alice_return.json()["room"]["players"]] == ["Alice"]
+    assert [p["name"] for p in alice_return.json()["room"]["players"]] == [
+        "Alice",
+        "Bob",
+    ]
     assert [p["name"] for p in bob_return.json()["room"]["players"]] == [
         "Alice",
         "Bob",

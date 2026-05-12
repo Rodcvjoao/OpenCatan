@@ -5,6 +5,7 @@ import { doProposeTradeOffer } from "./commands";
 import { openInfoDialog } from "./dialogs/info";
 import { $ } from "./dom";
 import { toggleFps } from "./fpsCounter";
+import { openGameLobby } from "./menu/gameLobby";
 import { showToast } from "./toast";
 
 export function bindSidebar(): void {
@@ -22,6 +23,9 @@ export function bindSidebar(): void {
   $("sb-rules").addEventListener("click", () =>
     showToast("Rules not implemented yet"),
   );
+  $("sb-lobby").addEventListener("click", () => {
+    openGameLobby();
+  });
   $("sb-settings").addEventListener("click", () =>
     showToast("Settings not implemented yet"),
   );

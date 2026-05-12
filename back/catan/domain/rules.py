@@ -98,6 +98,8 @@ class RuleEngine:
             owner_id = game.board.vertices[vertex_id].owner_id()
             if owner_id is None:
                 continue
+            if not game.is_active_player(owner_id):
+                continue
             if acting_player_id is not None and owner_id == acting_player_id:
                 continue
             victims.add(owner_id)

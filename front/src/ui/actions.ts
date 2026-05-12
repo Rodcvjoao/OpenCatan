@@ -156,7 +156,9 @@ export function renderActionButtons(): void {
 
   // Finished
   if (phase === "FINISHED") {
-    const winner = GameState.publicState.players.reduce((a, b) =>
+    const active = GameState.publicState.players.filter((p) => p.is_active);
+    const pool = active.length > 0 ? active : GameState.publicState.players;
+    const winner = pool.reduce((a, b) =>
       a.victory_points > b.victory_points ? a : b,
     );
     const win = document.createElement("div");

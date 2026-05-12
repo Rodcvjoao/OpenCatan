@@ -125,7 +125,9 @@ def test_public_join_rejects_return_lobby() -> None:
         manager.join_room(return_room.room_id, "Carol", "white")
 
     manager.change_color(return_room.room_id, return_token, "white")
-    assert return_room.players[0].color == "white"
+    updated = return_room.find_player(return_token)
+    assert updated is not None
+    assert updated.color == "white"
 
 
 # ---- Ready toggle ----

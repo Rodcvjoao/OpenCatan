@@ -298,6 +298,18 @@ class GameSession:
             self.game.end_turn()
             events.append({"type": "turn_ended", "player_id": player_id})
 
+        elif command == CommandType.LEAVE_GAME:
+            winner = self.game.leave_game(player_id)
+            events.append({"type": "player_left", "player_id": player_id})
+            if winner is not None:
+                events.append(
+                    {"type": "game_finished", "winner_player_id": winner.id}
+                )
+
+        elif command == CommandType.REJOIN_GAME:
+            self.game.rejoin_game(player_id)
+            events.append({"type": "player_rejoined", "player_id": player_id})
+
         else:
             raise ValueError(f"Unsupported command: {command}")
 

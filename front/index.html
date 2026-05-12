@@ -27,6 +27,7 @@
           <button id="sb-stats"    class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl">&#x1F4CA;</button>
           <button id="sb-info"     class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl">&#x2139;&#xFE0F;</button>
           <button id="sb-rules"    class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl">&#x1F4D6;</button>
+          <button id="sb-lobby"    class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl" title="Return to lobby">&#x1F519;</button>
           <button id="sb-settings" class="btn-side w-12 h-10 rounded flex items-center justify-center text-xl">&#x2699;&#xFE0F;</button>
           <button id="sb-fps" title="Toggle FPS (F)" class="btn-side w-12 h-10 rounded flex items-center justify-center text-xs font-bold text-[#3e2723]">FPS</button>
         </div>
@@ -220,6 +221,20 @@
         <div class="flex justify-between mt-6">
           <button id="btn-st-reset" class="btn-action px-4 py-2 rounded font-bold text-[#3e2723] text-sm">Reset Defaults</button>
           <button id="btn-st-back" class="btn-action px-6 py-2 rounded font-bold text-[#3e2723] text-lg">Back</button>
+        </div>
+      </div>
+
+      <!-- ===== Game Lobby (in-game roster) ===== -->
+      <div id="screen-game-lobby" class="hidden bg-[#3e2723] border-2 border-yellow-700 rounded-xl p-6 w-[480px] shadow-2xl">
+        <h2 class="font-game text-yellow-400 text-2xl text-center mb-3">Match Lobby</h2>
+        <p class="text-yellow-700 text-xs text-center mb-3">View who is still in the match and manage your presence.</p>
+        <div id="game-lobby-players" class="space-y-2 mb-4"></div>
+        <div class="flex justify-between items-center">
+          <button id="btn-game-lobby-back" class="btn-action px-4 py-2 rounded font-bold text-[#3e2723]">Back to Game</button>
+          <div class="flex space-x-2">
+            <button id="btn-game-lobby-rejoin" class="btn-action px-4 py-2 rounded font-bold text-[#3e2723] hidden">Rejoin Match</button>
+            <button id="btn-game-lobby-leave" class="btn-action px-4 py-2 rounded font-bold text-[#3e2723]">Leave Match</button>
+          </div>
         </div>
       </div>
 

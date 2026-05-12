@@ -29,11 +29,15 @@ export function renderPlayerCards(): void {
       const bg = PLAYER_COLORS[color] ?? color;
       const bgDark = PLAYER_COLORS_DARK[color] ?? "#333";
       const bgMid = PLAYER_COLORS_MID[color] ?? "#555";
-      const isCurrent = p.id === currentId;
+      const isCurrent = p.id === currentId && p.is_active;
       const isMe = p.id === GameState.myPlayerId;
+      const isActive = p.is_active;
       const glowClass = isCurrent ? "glow-current" : "";
       const widthClass = isMe ? "w-64" : "w-56";
       const name = escapeHtml(p.name);
+      const status = isActive
+        ? ""
+        : ' <span class="text-red-300 text-[10px]">(left)</span>';
 
       return (
         '<div class="relative bg-[#3e2723] p-1 rounded-lg border-2 ' +
@@ -56,6 +60,7 @@ export function renderPlayerCards(): void {
         '<span class="text-white font-bold text-sm">' +
         name +
         (isMe ? " (you)" : "") +
+        status +
         "</span>" +
         (isCurrent
           ? '<span class="text-yellow-300 text-xs font-bold">&#9733;</span>'

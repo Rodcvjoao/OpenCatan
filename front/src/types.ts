@@ -78,6 +78,8 @@ export interface PlayerPublic {
   id: number;
   name: string;
   color: PlayerColor;
+  is_active: boolean;
+  is_host: boolean;
   resource_count: number;
   dev_card_count: number;
   roads: number;
@@ -183,7 +185,9 @@ export type CommandName =
   | "propose_trade_offer"
   | "respond_trade_offer"
   | "cancel_trade_offer"
-  | "end_turn";
+  | "end_turn"
+  | "leave_game"
+  | "rejoin_game";
 
 export interface CommandEvent {
   type: string;

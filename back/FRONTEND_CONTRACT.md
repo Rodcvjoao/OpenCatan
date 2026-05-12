@@ -62,8 +62,9 @@ Default colors (if omitted):
 
 ## Return To Lobby
 
-After `public_state.phase` becomes `FINISHED`, a client may enter the return
-lobby for that finished game.
+At any time after a game is created, a client may enter a return lobby for
+that game. This does not end the match; it only moves that client back to a
+lobby context.
 
 Request:
 
@@ -84,17 +85,18 @@ Response:
 
 Rules:
 
-- The request is only valid for games started from a room.
-- The request is rejected before the game reaches `FINISHED`.
-- The first valid request creates a return lobby for the finished game. If
-  the game came from an existing room, that room code is reused when it is
-  still available; otherwise a new room code is generated.
+- The request is valid for any existing game (room-started or direct).
+- The game continues running; this endpoint only creates/joins a return lobby.
+- The first valid request creates a return lobby for the game. If the game
+  came from an existing room, that room code is reused when it is still
+  available; otherwise a new room code is generated.
 - The returning player receives a new lobby token.
-- Later requests from other players in the finished game add only that
-  returning player to the same return lobby with their own new lobby token.
+- Later requests from other players in the same game add only that player to
+  the same return lobby with their own new lobby token.
 - Return lobbies do not accept public `POST /rooms/{room_id}/join` requests;
-  players must enter through this endpoint with a finished-game token.
-- Players who do not call this endpoint are not shown in the return lobby.
+  players must enter through this endpoint with a game token.
+- The return lobby includes the full game roster immediately, even before
+  every player calls this endpoint.
 - Clients should resume the returned lobby as host or guest based on their
   player entry in `room.players`.
 
@@ -136,6 +138,8 @@ Shape:
   - `ports[]`: `id`, `port_type`, `trade_ratio`, `vertex_ids[2]`
 - `players[]`:
   - `id`, `name`, `color`
+  - `is_active` (bool; false when a player has left the match)
+  - `is_host` (bool; current match host among active players)
   - `resource_count`, `dev_card_count`
   - `roads`, `settlements`, `cities`
   - `victory_points` (publicly visible points; hidden VP cards are excluded until game end)
@@ -209,6 +213,8 @@ On rejection:
 - `respond_trade_offer`
 - `cancel_trade_offer`
 - `end_turn`
+- `leave_game`
+- `rejoin_game`
 
 ## Payload Contracts
 
@@ -221,6 +227,8 @@ On rejection:
 - `build_road`: `{ "edge_id": int }`
 - `roll_dice`: `{}`
 - `end_turn`: `{}`
+- `leave_game`: `{}`
+- `rejoin_game`: `{}`
 
 ### Roll 7 Discard Flow
 
